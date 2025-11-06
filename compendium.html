@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Compendium – 도감 (신규 스탯 체계)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f0f12;--panel:#18181f;--panel2:#121219;--text:#e8e6e3;--muted:#b7b3ad;--gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1000px 600px at 70% -10%, rgba(212,175,55,.12), transparent 70%),var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif}
+    a{color:inherit;text-decoration:none}
+
+    .wrap{display:grid;grid-template-columns:240px 1fr;gap:14px;padding:16px}
+    .side{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+    .main{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;position:relative}
+
+    .menu{display:flex;flex-direction:column;gap:8px}
+    .mbtn{padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.02);cursor:pointer;text-align:left}
+    .mbtn.active, .mbtn:hover{border-color:var(--card)}
+
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    h1{font-family:'Cinzel',serif;margin:0}
+
+    .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer}
+    .btn.gold{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#111;border:none}
+    input,select{background:#11141a;color:var(--text);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px}
+
+    .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 12px}
+    .chip{padding:6px 10px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer;font-size:.9rem}
+    .chip.active{background:rgba(212,175,55,.15);border-color:var(--card)}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .card{border:1px solid var(--card);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.02);cursor:pointer;transition:.2s}
+    .card:hover{transform:translateY(-3px)}
+    .thumb{height:120px;background:#24242d center/cover no-repeat}
+    .card .meta{padding:8px}
+    .tag{font-size:.75rem;color:var(--muted)}
+    .badge{display:inline-block;min-width:26px;text-align:center;font-weight:800;border:1px solid rgba(212,175,55,.45);border-radius:6px;padding:1px 6px;margin-left:6px;color:#e9e1c9}
+    /* Tier coloring by rank */
+    .badge[data-rank="EX"], .badge[data-rank^="S"]{background:rgba(212,175,55,.18)}
+    .badge[data-rank^="A"]{background:rgba(102,187,106,.18)}
+    .badge[data-rank^="B"]{background:rgba(100,181,246,.18)}
+    .badge[data-rank^="C"]{background:rgba(255,202,40,.12)}
+    .badge[data-rank^="D"]{background:rgba(239,83,80,.12)}
+    .badge[data-rank^="F"]{background:rgba(176,190,197,.18);color:#e0e6e9}
+
+    /* Icon preview */
+    .prev{width:72px;height:72px;border-radius:10px;border:1px solid rgba(212,175,55,.35);background:#1a1d25;object-fit:cover}
+    .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+    /* Drawer */
+    .drawer{position:absolute;top:0;right:0;width:min(540px,100%);height:100%;background:linear-gradient(180deg,var(--panel),var(--panel2));border-left:1px solid rgba(255,255,255,.08);padding:14px;display:none}
+    .drawer.show{display:block}
+    .kv{display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center}
+    textarea{min-height:120px}
+    .rows{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+    .statrow{display:grid;grid-template-columns:120px 1fr 70px 80px;gap:6px;align-items:center}
+    .statrow small{color:var(--muted)}
+    .bar{height:8px;background:#0d0f14;border:1px solid rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+    .bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:50%}
+
+    .empty{border:2px dashed rgba(255,255,255,.1);border-radius:12px;padding:24px;text-align:center;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="side">
+      <div class="menu">
+        <button class="mbtn active" data-filter="all">전체</button>
+        <button class="mbtn" data-filter="trait">특성</button>
+        <button class="mbtn" data-filter="tech">기술</button>
+        <button class="mbtn" data-filter="magic">마법</button>
+        <button class="mbtn" data-filter="skill">스킬</button>
+        <button class="mbtn" data-filter="authority">권능</button>
+        <button class="mbtn" data-filter="blessing">가호</button>
+        <button class="mbtn" data-filter="proficiency">숙련도</button>
+        <hr style="border-color:rgba(255,255,255,.08)">
+        <button class="mbtn" id="addBtn">+ 새 항목</button>
+        <label class="mbtn">불러오기(JSON)
+          <input type="file" id="importInput" accept="application/json" hidden>
+        </label>
+        <button class="mbtn" id="exportBtn">내보내기(JSON)</button>
+        <a class="mbtn" href="main.html">← 메인</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header>
+        <h1>도감</h1>
+        <div class="tools">
+          <input id="q" placeholder="검색(이름, 태그, 등급)" style="min-width:220px">
+          <select id="sortSel" title="정렬">
+            <option value="name">가나다순</option>
+            <option value="tag">태그 그룹 순</option>
+            <option value="rankDesc">등급 (고 → 저)</option>
+          </select>
+          <select id="rankSel" title="등급 필터">
+            <option value="">등급 전체</option>
+            <option value="EX">EX</option><option value="SSS">SSS</option><option value="SS">SS</option><option value="S+">S+</option><option value="S">S</option>
+            <option value="A++">A++</option><option value="A+">A+</option><option value="A">A</option><option value="A-">A-</option>
+            <option value="B++">B++</option><option value="B+">B+</option><option value="B">B</option><option value="B-">B-</option>
+            <option value="C++">C++</option><option value="C+">C+</option><option value="C">C</option><option value="C-">C-</option>
+            <option value="D++">D++</option><option value="D+">D+</option><option value="D">D</option><option value="D-">D-</option>
+            <option value="F++">F++</option><option value="F+">F+</option><option value="F">F</option><option value="F-">F-</option>
+          </select>
+          <button class="btn" id="clearBtn" title="필터 초기화">필터 초기화</button>
+        </div>
+      </header>
+      <div class="chips" id="tagChips"></div>
+
+      <div id="list" class="grid"></div>
+      <div id="empty" class="empty" style="display:none">아직 등록된 항목이 없습니다. 왼쪽의 "새 항목"을 눌러 추가하세요.</div>
+
+      <aside id="drawer" class="drawer">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <strong id="dwTitle">항목</strong>
+          <div>
+            <button id="closeDw" class="btn">닫기</button>
+            <button id="saveDw" class="btn gold">저장</button>
+          </div>
+        </div>
+        <div class="kv"><label>종류</label><select id="fType">
+          <option value="trait">특성</option>
+          <option value="tech">기술</option>
+          <option value="magic">마법</option>
+          <option value="skill">스킬</option>
+          <option value="authority">권능</option>
+          <option value="blessing">가호</option>
+          <option value="proficiency">숙련도</option>
+        </select></div>
+        <div class="kv"><label>이름</label><input id="fName"></div>
+        <div class="kv"><label>등급</label><select id="fRank">
+          <option value="">— 없음 —</option>
+          <option value="EX">EX</option>
+          <option value="SSS">SSS</option>
+          <option value="SS">SS</option>
+          <option value="S+">S+</option>
+          <option value="S">S</option>
+          <option value="A++">A++</option>
+          <option value="A+">A+</option>
+          <option value="A">A</option>
+          <option value="A-">A-</option>
+          <option value="B++">B++</option>
+          <option value="B+">B+</option>
+          <option value="B">B</option>
+          <option value="B-">B-</option>
+          <option value="C++">C++</option>
+          <option value="C+">C+</option>
+          <option value="C">C</option>
+          <option value="C-">C-</option>
+          <option value="D++">D++</option>
+          <option value="D+">D+</option>
+          <option value="D">D</option>
+          <option value="D-">D-</option>
+          <option value="F++">F++</option>
+          <option value="F+">F+</option>
+          <option value="F">F</option>
+          <option value="F-">F-</option>
+        </select></div>
+        <div class="kv"><label>아이콘</label>
+          <div class="inline">
+            <input id="fIcon" placeholder="이미지 URL (선택)">
+            <label class="btn">파일 업로드<input id="fIconFile" type="file" accept="image/*" hidden></label>
+          </div>
+        </div>
+        <div class="kv"><label>미리보기</label><img id="iconPreview" class="prev" alt="icon preview"></div>
+        <div class="kv"><label>태그</label><input id="fTags" placeholder=",로 구분"></div>
+        <div class="kv" style="align-items:start"><label>설명</label><textarea id="fDesc"></textarea></div>
+        <hr style="border-color:rgba(255,255,255,.08);margin:10px 0">
+        <div class="rows">
+          <div class="statrow"><span>근력</span><div class="bar"><span></span></div><input id="mStr" type="number" value="0" title="고정값(±)"><input id="mStrP" type="number" step="0.1" value="0" placeholder="%" title="% 보정"></div>
+          <div class="statrow"><span>내구</span><div class="bar"><span></span></div><input id="mEnd" type="number" value="0"><input id="mEndP" type="number" step="0.1" value="0" placeholder="%"></div>
+          <div class="statrow"><span>민첩</span><div class="bar"><span></span></div><input id="mAgi" type="number" value="0"><input id="mAgiP" type="number" step="0.1" value="0" placeholder="%"></div>
+          <div class="statrow"><span>지력</span><div class="bar"><span></span></div><input id="mInt" type="number" value="0"><input id="mIntP" type="number" step="0.1" value="0" placeholder="%"></div>
+          <div class="statrow"><span>마나/내력</span><div class="bar"><span></span></div><input id="mMana" type="number" value="0"><input id="mManaP" type="number" step="0.1" value="0" placeholder="%"></div>
+          <div class="statrow"><span>행운</span><div class="bar"><span></span></div><input id="mLuck" type="number" value="0"><input id="mLuckP" type="number" step="0.1" value="0" placeholder="%"></div>
+        </div>
+        <p style="color:var(--muted);margin-top:6px">※ 스탯 보정은 "특성" 종류에서만 사용됩니다. (±, % 모두 지원) — <small>기존 키(atk/def/spd/hp)와도 자동 호환</small></p>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const KEY='codex.v1';
+    const $=s=>document.querySelector(s);
+    const listEl=$('#list'); const emptyEl=$('#empty'); const drawer=$('#drawer');
+    const q=$('#q'); const importInput=$('#importInput'); const sortSel=$('#sortSel'); const rankSel=$('#rankSel'); const clearBtn=$('#clearBtn');
+    const tagChips=$('#tagChips');
+
+    const TYPE_LABELS={trait:'특성', tech:'기술', magic:'마법', skill:'스킬', authority:'권능', blessing:'가호', proficiency:'숙련도'};
+    const RANK_ORDER=["EX","SSS","SS","S+","S","A++","A+","A","A-","B++","B+","B","B-","C++","C+","C","C-","D++","D+","D","D-","F++","F+","F","F-"];
+    const rankIndex = r=>{ const i=RANK_ORDER.indexOf(r||''); return i<0?999:i };
+
+    const f={ type:$('#fType'), name:$('#fName'), icon:$('#fIcon'), iconFile:$('#fIconFile'), iconPrev:$('#iconPreview'), desc:$('#fDesc'), tags:$('#fTags'), rank:$('#fRank'),
+      mStr:$('#mStr'), mEnd:$('#mEnd'), mAgi:$('#mAgi'), mInt:$('#mInt'), mMana:$('#mMana'), mLuck:$('#mLuck'),
+      mStrP:$('#mStrP'), mEndP:$('#mEndP'), mAgiP:$('#mAgiP'), mIntP:$('#mIntP'), mManaP:$('#mManaP'), mLuckP:$('#mLuckP') };
+
+    function uid(){return Math.random().toString(36).slice(2,9)}
+    function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]') }catch{ return [] } }
+    function save(data){ localStorage.setItem(KEY, JSON.stringify(data)); }
+
+    let data=load();
+    let current=null; const activeTags=new Set();
+
+    function buildTagChips(){
+      const map=new Map();
+      data.forEach(x=> (x.tags||'').split(/\s*,\s*/).forEach(t=>{ if(!t) return; const k=t.toLowerCase(); map.set(k,(map.get(k)||0)+1) }));
+      const tags=[...map.entries()].sort((a,b)=> a[0].localeCompare(b[0],'ko')).slice(0,60);
+      tagChips.innerHTML='';
+      tags.forEach(([t,count])=>{
+        const b=document.createElement('button'); b.className='chip'; b.textContent=`#${t}`; b.title=`${count}개 포함`;
+        if(activeTags.has(t)) b.classList.add('active');
+        b.onclick=()=>{ if(activeTags.has(t)) activeTags.delete(t); else activeTags.add(t); render(currentFilter()); };
+        tagChips.appendChild(b);
+      });
+    }
+
+    function currentFilter(){ return document.querySelector('.mbtn.active')?.dataset.filter||'all' }
+
+    function filteredSorted(filter){
+      const term=(q.value||'').toLowerCase();
+      let arr=data.filter(x=> (filter==='all'||x.type===filter) && (
+        x.name.toLowerCase().includes(term) || (x.tags||'').toLowerCase().includes(term) || (x.rank||'').toLowerCase().includes(term)
+      ));
+      if(rankSel.value){ arr = arr.filter(x=> (x.rank||'')===rankSel.value); }
+      if(activeTags.size){
+        arr = arr.filter(x=>{
+          const tags=(x.tags||'').split(/\s*,\s*/).map(s=>s.toLowerCase()).filter(Boolean);
+          for(const t of activeTags){ if(tags.includes(t)) return true; }
+          return false;
+        });
+      }
+      const sort=sortSel.value;
+      if(sort==='name') arr.sort((a,b)=> a.name.localeCompare(b.name,'ko'));
+      else if(sort==='tag'){
+        const firstTag = o=> (o.tags||'').split(/\s*,\s*/).filter(Boolean)[0]||'';
+        arr.sort((a,b)=> firstTag(a).localeCompare(firstTag(b),'ko') || a.name.localeCompare(b.name,'ko'));
+      } else if(sort==='rankDesc'){
+        arr.sort((a,b)=> rankIndex(a.rank) - rankIndex(b.rank) || a.name.localeCompare(b.name,'ko'));
+      }
+      return arr;
+    }
+
+    function render(filter='all'){
+      const arr = filteredSorted(filter);
+      listEl.innerHTML=''; emptyEl.style.display = arr.length? 'none':'block';
+      arr.forEach(x=>{
+        const card=document.createElement('div'); card.className='card'; card.onclick=()=>openDrawer(x.id);
+        card.innerHTML=`<div class='thumb' style="background-image:url('${x.icon||''}')"></div>
+                        <div class='meta'><div style='font-weight:700'>${x.name}${x.rank?` <span class=\"badge\" data-rank=\"${x.rank}\">${x.rank}</span>`:''}</div>
+                        <div class='tag'>${TYPE_LABELS[x.type]||x.type} · ${(x.tags||'')}</div></div>`;
+        listEl.appendChild(card);
+      })
+    }
+
+    function openDrawer(id){
+      const item = data.find(x=>x.id===id);
+      current = item || {id:uid(), type:'trait', name:'', icon:'', desc:'', tags:'', rank:'', mod:{}, modP:{}};
+      $('#dwTitle').textContent = item? '항목 수정' : '새 항목';
+      f.type.value=current.type; f.name.value=current.name; f.icon.value=current.icon; f.desc.value=current.desc; f.tags.value=current.tags||''; f.rank.value=current.rank||''; f.iconPrev.src=current.icon||'';
+      const m=current.mod||{}; const p=current.modP||{};
+      // 호환: 이전 키(atk/def/spd/hp)도 읽어서 채우기
+      f.mStr.value = m.str ?? m.atk ?? 0; f.mEnd.value = m.end ?? m.def ?? 0; f.mAgi.value = m.agi ?? m.spd ?? 0; f.mInt.value = m.int ?? 0; f.mMana.value = m.mana ?? m.hp ?? 0; f.mLuck.value = m.luck ?? 0;
+      f.mStrP.value = p.str ?? p.atk ?? 0; f.mEndP.value = p.end ?? p.def ?? 0; f.mAgiP.value = p.agi ?? p.spd ?? 0; f.mIntP.value = p.int ?? 0; f.mManaP.value = p.mana ?? p.hp ?? 0; f.mLuckP.value = p.luck ?? 0;
+      drawer.classList.add('show');
+      if(f.iconFile){ f.iconFile.onchange = (e)=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onload=()=>{ f.icon.value=r.result; f.iconPrev.src=r.result; }; r.readAsDataURL(file) }; }
+      if(f.icon){ f.icon.oninput = ()=>{ f.iconPrev.src = f.icon.value; } }
+    }
+
+    function closeDrawer(){ drawer.classList.remove('show') }
+
+    function persist(){
+      const idx = data.findIndex(x=>x.id===current.id);
+      const entry = { id: current.id, type:f.type.value, name:f.name.value.trim(), icon:f.icon.value.trim(), desc:f.desc.value.trim(), tags:f.tags.value.trim(), rank:f.rank.value,
+        // 새 키로 저장 (str/end/agi/int/mana/luck)
+        mod: { str:+f.mStr.value||0, end:+f.mEnd.value||0, agi:+f.mAgi.value||0, int:+f.mInt.value||0, mana:+f.mMana.value||0, luck:+f.mLuck.value||0 },
+        modP: { str:+f.mStrP.value||0, end:+f.mEndP.value||0, agi:+f.mAgiP.value||0, int:+f.mIntP.value||0, mana:+f.mManaP.value||0, luck:+f.mLuckP.value||0 } };
+      if(idx>=0) data[idx]=entry; else data.push(entry);
+      save(data); buildTagChips(); render(currentFilter()); closeDrawer();
+    }
+
+    // Events
+    document.querySelectorAll('.mbtn[data-filter]').forEach(b=> b.onclick=()=>{ document.querySelectorAll('.mbtn[data-filter]').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render(b.dataset.filter) });
+    $('#addBtn').onclick=()=> openDrawer(null);
+    $('#closeDw').onclick=closeDrawer; $('#saveDw').onclick=persist;
+
+    q.oninput=()=> render(currentFilter());
+    sortSel.onchange=()=> render(currentFilter());
+    rankSel.onchange=()=> render(currentFilter());
+    clearBtn.onclick=()=>{ activeTags.clear(); q.value=''; rankSel.value=''; buildTagChips(); render('all'); };
+
+    $('#exportBtn').onclick=()=>{ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='codex.json'; a.click(); URL.revokeObjectURL(a.href) };
+    importInput.onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const arr=JSON.parse(r.result); if(Array.isArray(arr)){ data=arr; save(data); buildTagChips(); render(currentFilter()); } }catch{} }; r.readAsText(f) };
+
+    // Init
+    render('all');
+    buildTagChips();
+  </script>
+</body>
+</html>

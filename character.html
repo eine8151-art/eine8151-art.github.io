@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Character – 프로필</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f0f12;--panel:#18181f;--panel2:#121219;--text:#e8e6e3;--muted:#b7b3ad;--gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1000px 600px at 70% -10%, rgba(212,175,55,.12), transparent 70%),var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif}
+    a{color:inherit;text-decoration:none}
+
+    header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .btn{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer}
+    .btn.gold{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#111;border:none}
+
+    .wrap{display:grid;grid-template-columns:300px 1fr 360px;gap:14px;padding:16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+
+    .avatar{width:100%;aspect-ratio:3/4;border-radius:12px;border:1px solid var(--card);object-fit:cover;background:#1d1f26}
+    .title{font-family:'Cinzel',serif;letter-spacing:.06em;margin:0}
+    .sub{color:var(--muted)}
+
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .kv{display:grid;grid-template-columns:110px 1fr;gap:6px;align-items:center}
+
+    .statrow{display:grid;grid-template-columns:110px 1fr 70px;gap:8px;align-items:center}
+    .stat-header{display:flex;align-items:center;justify-content:space-between;margin:12px 0 8px}
+    .radarWrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+    .radar{width:340px;height:260px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:#0d0f14;display:flex;align-items:center;justify-content:center}
+    .radar svg{width:92%;height:92%}
+    .legend{display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:6px;min-width:260px}
+    .bar{height:12px;background:#0d0f14;border:1px solid rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+    .bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0%}
+    .delta{font-variant-numeric:tabular-nums}
+
+    .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(212,175,55,.35);margin:4px 6px 0 0}
+    .skillWrap .group{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+    .skillWrap .gtitle{margin:0 0 8px;font-size:1rem;color:#e0d3b8;font-family:'Cinzel',serif;letter-spacing:.04em}
+    .skillWrap .plist{display:flex;flex-wrap:wrap}
+    .small{font-size:.9rem;color:var(--muted)}
+
+    .tag{font-size:.8rem;color:var(--muted)}
+    .badge{display:inline-block;min-width:26px;text-align:center;font-weight:800;border:1px solid rgba(212,175,55,.45);border-radius:6px;padding:1px 6px;margin-left:6px;color:#e9e1c9}
+    .badge[data-rank="EX"], .badge[data-rank^="S"]{background:rgba(212,175,55,.18)}
+    .badge[data-rank^="A"]{background:rgba(102,187,106,.18)}
+    .badge[data-rank^="B"]{background:rgba(100,181,246,.18)}
+    .badge[data-rank^="C"]{background:rgba(255,202,40,.12)}
+    .badge[data-rank^="D"]{background:rgba(239,83,80,.12)}
+    .badge[data-rank^="F"]{background:rgba(176,190,197,.18);color:#e0e6e9}
+
+    ul{margin:0;padding-left:18px}
+  </style>
+</head>
+<body>
+  <header>
+    <strong style="font-family:'Cinzel',serif;letter-spacing:.06em">CHARACTER</strong>
+    <div>
+      <a class="btn" href="main.html">← 메인</a>
+      <a class="btn" href="member.html">멤버 관리</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- LEFT: Portrait & Basic -->
+    <section class="card">
+      <img id="cImg" class="avatar" alt="portrait">
+      <div style="margin-top:10px">
+        <div class="kv"><span>역할</span><strong id="cRole">-</strong></div>
+        <div class="kv"><span>소속</span><div id="cSub" class="small">-</div></div>
+      </div>
+    </section>
+
+    <!-- CENTER: Stats & Skills -->
+    <section class="card">
+      <h2 class="title" id="cName">캐릭터</h2>
+      <div class="sub" id="cNote" style="margin-bottom:8px"></div>
+
+      <div class="stat-header"><h3 style="margin:0">스탯</h3><button id="chartToggle" class="btn">방사형 보기</button></div>
+      <div id="statsBox"></div>
+      <div class="small" id="statsHelp">기본치 + (특성의 ±, % 보정) = 최종치</div>
+
+      <h3 style="margin:16px 0 8px">스킬/특성</h3>
+      <div id="skillWrap" class="skillWrap"></div>
+    </section>
+
+    <!-- RIGHT: Equipment & Timeline -->
+    <section class="card">
+      <h3 style="margin:0 0 8px">장비</h3>
+      <div class="kv"><span>장갑</span><div id="eqGlove" class="small">-</div></div>
+      <div class="kv"><span>바지</span><div id="eqPants" class="small">-</div></div>
+      <div class="kv"><span>셔츠</span><div id="eqShirt" class="small">-</div></div>
+      <div class="kv"><span>신발</span><div id="eqBoots" class="small">-</div></div>
+      <div class="kv"><span>무기</span><div id="eqWeapon" class="small">-</div></div>
+
+      <h3 style="margin:14px 0 8px">타임라인</h3>
+      <div id="timeline" class="small">(기록 없음)</div>
+    </section>
+  </div>
+
+  <script>
+    const STORE='members.v1', REP='representativeId', CODEX='codex.v1';
+    const TYPE_LABELS={trait:'특성', tech:'기술', magic:'마법', skill:'스킬', authority:'권능', blessing:'가호', proficiency:'숙련도'};
+    const RANK_ORDER=["EX","SSS","SS","S+","S","A++","A+","A","A-","B++","B+","B","B-","C++","C+","C","C-","D++","D+","D","D-","F++","F+","F","F-"];
+    const rankIndex=r=>{const i=RANK_ORDER.indexOf(r||''); return i<0?999:i};
+    // 능력치 등급 스케일 (최종치 기준)
+    const GRADE_SCALE=[
+      {min:5000, rank:'EX'},
+      {min:2000, rank:'SSS'},
+      {min:600,  rank:'SS'},
+      {min:580,  rank:'S+'},
+      {min:400,  rank:'S'},
+      {min:390,  rank:'A++'},
+      {min:300,  rank:'A+'},
+      {min:200,  rank:'A'},
+      {min:190,  rank:'B++'},
+      {min:150,  rank:'B+'},
+      {min:70,   rank:'B'},
+      {min:65,   rank:'C+'},
+      {min:50,   rank:'C'},
+      {min:45,   rank:'D+'},
+      {min:20,   rank:'D'},
+      {min:0,    rank:'F'}
+    ];
+    const gradeFor = v => { for(const g of GRADE_SCALE){ if((v||0) >= g.min) return g.rank } return 'F' };
+
+    const $=s=>document.querySelector(s);
+
+    function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name) }
+    function loadMembers(){ try{ return JSON.parse(localStorage.getItem(STORE)||'[]') }catch{ return [] } }
+    function loadCodex(){ try{ return JSON.parse(localStorage.getItem(CODEX)||'[]') }catch{ return [] } }
+
+    function pickCharacter(list){
+      const byId = getParam('id');
+      if(byId){ return list.find(x=>x.id===byId) || list[0] }
+      const rep = localStorage.getItem(REP);
+      if(rep){ return list.find(x=>x.id===rep) || list[0] }
+      return list[0];
+    }
+
+    function statRow(label, base, delta, maxRef){
+      const row=document.createElement('div'); row.className='statrow';
+      const final = (base||0) + (delta||0);
+      const grade = gradeFor(final);
+      const maxVal = Math.max(1, maxRef||final, base, final, (base||0)+Math.abs(delta||0));
+      const signed = delta? (delta>0?`+${delta}`:`${delta}`) : '';
+      row.innerHTML = `<span>${label} [${grade}]</span>
+        <div class='bar'><span style='width:${Math.min(100, (final/maxVal)*100)}%'></span></div>
+        <div class='delta'>${final}${signed?` <span style='color:${delta>0?'#7ce085':'#f48fb1'}'>(${signed})</span>`:''}</div>`;
+      return row;
+    }
+
+    function collectTraitMods(names){
+      const codex = loadCodex();
+      const set = new Set((names||[]).map(s=>(s||'').toLowerCase()));
+      const flat = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+      const pct  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+      codex.forEach(e=>{
+        if(e.type==='trait' && set.has((e.name||'').toLowerCase())){
+          const m = e.mod  || {};
+          const p = e.modP || {};
+          flat.str  += +(m.str  ?? m.atk  ?? 0);
+          flat.end  += +(m.end  ?? m.def  ?? 0);
+          flat.agi  += +(m.agi  ?? m.spd  ?? 0);
+          flat.int  += +(m.int  ?? 0);
+          flat.mana += +(m.mana ?? m.hp   ?? 0);
+          flat.luck += +(m.luck ?? 0);
+          pct.str   += +(p.str  ?? p.atk  ?? 0);
+          pct.end   += +(p.end  ?? p.def  ?? 0);
+          pct.agi   += +(p.agi  ?? p.spd  ?? 0);
+          pct.int   += +(p.int  ?? 0);
+          pct.mana  += +(p.mana ?? p.hp   ?? 0);
+          pct.luck  += +(p.luck ?? 0);
+        }
+      });
+      return {flat, pct};
+    }
+
+    function render(){
+      const list = loadMembers();
+      if(!list.length){ alert('멤버 데이터가 없습니다. member.html에서 캐릭터를 먼저 생성하세요.'); return; }
+      const ch = pickCharacter(list);
+
+      // Basic
+      $('#cName').textContent = ch.name||'무명';
+      $('#cNote').textContent = ch.note||'';
+      $('#cRole').textContent = ch.role||'-';
+      $('#cSub').textContent  = ch.sub||'-';
+      $('#cImg').src = ch.img||'https://via.placeholder.com/420x560/1d1f26/777?text=NO+IMAGE';
+
+      // Equip
+      const eq = ch.equip||{};
+      ['Glove','Pants','Shirt','Boots','Weapon'].forEach(k=>{ const el=$('#eq'+k); el.textContent = eq[k.toLowerCase()]||'-' });
+
+      // Timeline
+      const tl = ch.timeline||[];
+      $('#timeline').innerHTML = tl.length? tl.map(t=>`• ${t.date||''} – ${t.text||''}`).join('<br>') : '(기록 없음)';
+
+      // Stats base (new keys first, fallback to old)
+      const st = ch.stats||{};
+      const base = {
+        str: +(st.str  ?? st.atk  ?? 0),
+        end: +(st.end  ?? st.def  ?? 0),
+        agi: +(st.agi  ?? st.spd  ?? 0),
+        int: +(st.int  ?? 0),
+        mana:+(st.mana ?? st.hp   ?? 0),
+        luck:+(st.luck ?? 0),
+      };
+
+      // Trait modifiers
+      const mods = collectTraitMods(ch.skills);
+      const order = [
+        ['근력','str'],['내구','end'],['민첩','agi'],['지력','int'],['마나/내력','mana'],['행운','luck']
+      ];
+
+      // Build data set & max for scaling
+      const data = order.map(([label,k])=>{
+        const dFlat = mods.flat[k]||0; const dPct = mods.pct[k]||0; const final = (base[k]||0) + (dFlat + Math.round((base[k]||0) * (dPct/100)));
+        return {label, key:k, base: base[k]||0, delta: (dFlat + Math.round((base[k]||0) * (dPct/100))), final, grade: gradeFor(final)};
+      });
+      const maxFinal = Math.max(...data.map(d=>d.final), 1);
+
+      // Render chart
+      const box=$('#statsBox'); box.innerHTML='';
+      if(window.chartMode==='radar'){
+        box.appendChild(renderRadar(data, maxFinal));
+      }else{
+        data.forEach(d=> box.appendChild( statRow(d.label, d.base, d.delta, maxFinal) ));
+      }
+
+      // Skills list grouped
+      const codex = loadCodex();
+      const byName = new Map(codex.map(x=>[((x.name||'')+'').toLowerCase(), x]));
+      const skillWrap=$('#skillWrap'); skillWrap.innerHTML='';
+
+      const sections=[
+        {title:'특성', types:['trait']},
+        {title:'숙련도', types:['proficiency']},
+        {title:'기술/마법/스킬', types:['tech','magic','skill']},
+        {title:'가호/권능', types:['blessing','authority']}
+      ];
+
+      // Prepare grouped items
+      const grouped = new Map(sections.map(s=>[s.title,[]]));
+      (ch.skills||[]).forEach(n=>{
+        const x = byName.get((n||'').toLowerCase());
+        if(!x){ // 미등록 항목은 기술/마법/스킬 그룹으로 임시 분류
+          (grouped.get('기술/마법/스킬')||[]).push({name:n});
+          return;
+        }
+        const sec = sections.find(s=> s.types.includes(x.type));
+        const key = sec? sec.title : '기술/마법/스킬';
+        (grouped.get(key)||[]).push(x);
+      });
+
+      // Render
+      sections.forEach(sec=>{
+        const arr = grouped.get(sec.title)||[];
+        if(!arr.length) return;
+        const box=document.createElement('div'); box.className='group';
+        box.innerHTML = `<h4 class='gtitle'>${sec.title}</h4><div class='plist'></div>`;
+        const plist=box.querySelector('.plist');
+        arr.forEach(x=>{
+          const pill=document.createElement('span'); pill.className='pill';
+          if(x.type){
+            pill.innerHTML = `<span>${x.name}${x.rank?` <span class='badge' data-rank='${x.rank}'>${x.rank}</span>`:''}</span><span class='tag'> · ${TYPE_LABELS[x.type]||x.type}${x.tags?` · ${x.tags}`:''}</span>`;
+          } else {
+            pill.textContent = x.name||'';
+          }
+          plist.appendChild(pill);
+        });
+        skillWrap.appendChild(box);
+      });
+    };
+
+    render();
+
+    function renderRadar(data, max){
+      const wrap=document.createElement('div'); wrap.className='radarWrap';
+      const n=data.length; const size=320; const cx=size/2, cy=size/2; const r=120;
+      const svgNS='http://www.w3.org/2000/svg';
+      const holder=document.createElement('div'); holder.className='radar';
+      const svg=document.createElementNS(svgNS,'svg'); svg.setAttribute('viewBox',`0 0 ${size} ${size}`);
+      // grid circles
+      [0.25,0.5,0.75,1].forEach(p=>{ const c=document.createElementNS(svgNS,'circle'); c.setAttribute('cx',cx); c.setAttribute('cy',cy); c.setAttribute('r',r*p); c.setAttribute('fill','none'); c.setAttribute('stroke','rgba(255,255,255,.1)'); svg.appendChild(c) });
+      // axes
+      data.forEach((d,i)=>{ const ang=(-90 + i*(360/n)) * Math.PI/180; const x=cx + r*Math.cos(ang); const y=cy + r*Math.sin(ang); const ax=document.createElementNS(svgNS,'line'); ax.setAttribute('x1',cx); ax.setAttribute('y1',cy); ax.setAttribute('x2',x); ax.setAttribute('y2',y); ax.setAttribute('stroke','rgba(255,255,255,.12)'); svg.appendChild(ax); });
+      // polygon
+      const pts=data.map((d,i)=>{ const ang=(-90 + i*(360/n)) * Math.PI/180; const rr=r * Math.max(0, Math.min(1, d.final/max)); const x=cx + rr*Math.cos(ang); const y=cy + rr*Math.sin(ang); return `${x},${y}`; }).join(' ');
+      const poly=document.createElementNS(svgNS,'polygon'); poly.setAttribute('points',pts); poly.setAttribute('fill','rgba(212,175,55,.22)'); poly.setAttribute('stroke','var(--gold)'); poly.setAttribute('stroke-width','2'); svg.appendChild(poly);
+      holder.appendChild(svg); wrap.appendChild(holder);
+
+      // legend
+      const lg=document.createElement('div'); lg.className='legend';
+      data.forEach(d=>{ const row=document.createElement('div'); row.innerHTML=`<strong>${d.label} [${d.grade}]</strong> — ${d.final}${d.delta?` <span style='color:${d.delta>0?'#7ce085':'#f48fb1'}'>(${d.delta>0?'+':''}${d.delta})</span>`:''}`; lg.appendChild(row); });
+      wrap.appendChild(lg);
+      return wrap;
+    }
+  </script>
+</body>
+</html>

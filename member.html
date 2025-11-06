@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>member – 캐릭터 관리 + 도감 연동 (픽서)</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{--bg:#0f0f12;--panel:#18181f;--panel2:#121219;--text:#e8e6e3;--muted:#b7b3ad;--gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)}
+*{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.1), transparent 70%),var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif}
+.header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.btn{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#111;border:none;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}
+.btn.outline{background:transparent;color:var(--text);border:1px solid rgba(212,175,55,.4)}
+.wrap{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.item{border:1px solid var(--card);border-radius:10px;overflow:hidden;background:#1e1e26;cursor:pointer;transition:.2s}
+.item:hover{transform:translateY(-2px);box-shadow:0 10px 20px rgba(0,0,0,.35)}
+.item img{width:100%;height:160px;object-fit:cover}
+.item .t{padding:8px;text-align:center}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+input,select,textarea{background:#11141a;color:var(--text);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(212,175,55,.35);margin:4px 6px 0 0}
+.pill button{background:none;border:none;color:var(--muted);cursor:pointer}
+hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
+.preview{display:flex;gap:12px;align-items:flex-start}
+.preview img{width:160px;height:200px;border-radius:10px;border:1px solid var(--card);object-fit:cover}
+.small{font-size:.85rem;color:var(--muted)}
+
+/* === Mini Codex Picker === */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal.show{display:flex}
+.sheet{width:min(980px,100%);height:min(80vh,760px);display:grid;grid-template-columns:280px 1fr;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.12);border-radius:14px;overflow:hidden}
+.sleft{border-right:1px solid rgba(255,255,255,.08);padding:12px;display:flex;flex-direction:column;gap:8px}
+.sright{padding:12px;display:grid;grid-template-rows:auto 1fr auto;gap:8px}
+.srch{display:flex;gap:8px;flex-wrap:wrap}
+.tags{display:flex;flex-wrap:wrap;gap:8px}
+.tag{padding:6px 10px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer;font-size:.9rem}
+.tag.active{background:rgba(212,175,55,.15);border-color:var(--card)}
+.listc{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;overflow:auto}
+.cardc{border:1px solid var(--card);border-radius:10px;overflow:hidden;background:#1d1e25;cursor:pointer;transition:.15s}
+.cardc:hover{transform:translateY(-2px)}
+.cardc.selected{outline:2px solid var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.25) inset}
+.thc{height:110px;background:#2a2b33 center/cover no-repeat}
+.meta{padding:8px}
+.badge{display:inline-block;min-width:24px;text-align:center;font-weight:800;border:1px solid rgba(212,175,55,.45);border-radius:6px;padding:1px 6px;margin-left:6px;color:#e9e1c9}
+.badge[data-rank="EX"], .badge[data-rank^="S"]{background:rgba(212,175,55,.18)}
+.badge[data-rank^="A"]{background:rgba(102,187,106,.18)}
+.badge[data-rank^="B"]{background:rgba(100,181,246,.18)}
+.badge[data-rank^="C"]{background:rgba(255,202,40,.12)}
+.badge[data-rank^="D"]{background:rgba(239,83,80,.12)}
+.badge[data-rank^="F"]{background:rgba(176,190,197,.18);color:#e0e6e9}
+.detail{border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;display:grid;grid-template-columns:120px 1fr;gap:12px}
+.detail .prev{width:120px;height:120px;border-radius:10px;border:1px solid rgba(212,175,55,.35);background:#1a1d25;object-fit:cover}
+.bottom{display:flex;justify-content:space-between;align-items:center}
+.modal{overflow:auto}
+.sheet{max-height:90vh}
+.sright{grid-template-rows:auto 1fr;min-height:420px}
+.listc{overflow:auto}
+/* Overlay for item detail */
+.detailModal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:60}
+.detailModal.hidden{display:none}
+.detailBox{width:min(560px,92vw);max-height:80vh;overflow:auto;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px}
+.detailHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.detailGrid{display:grid;grid-template-columns:120px 1fr;gap:12px}
+.detailGrid img{width:120px;height:120px;border-radius:10px;border:1px solid var(--card);object-fit:cover;background:#1a1d25}
+</style>
+</head>
+<body>
+<header class="header">
+  <strong style="font-family:'Cinzel',serif;letter-spacing:.06em">MEMBER 관리</strong>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn outline" href="main.html">← main</a>
+    <button id="exportBtn" class="btn outline">내보내기</button>
+    <label class="btn outline" style="cursor:pointer">불러오기<input id="importInput" type="file" accept="application/json" hidden></label>
+    <button id="openDataBtn" class="btn outline" title="외부 JSON 파일 열기">데이터 열기</button>
+    <button id="saveDataBtn" class="btn outline" title="열어둔 JSON 파일에 저장">데이터 저장</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- LEFT: list -->
+  <section class="card">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="newBtn" class="btn">새 캐릭터</button>
+      <button id="saveBtn" class="btn outline">저장</button>
+      <button id="setRepBtn" class="btn outline" title="대표 캐릭터로 지정">대표 지정</button>
+    </div>
+    <div id="list" class="list"></div>
+    <div class="small">팁: 카드를 클릭하면 편집폼에 불러옵니다.</div>
+  </section>
+
+  <!-- RIGHT: editor -->
+  <section class="card">
+    <div class="grid2">
+      <div class="field"><label>이름</label><input id="fName" placeholder="예: 고양이 탐정"></div>
+      <div class="field"><label>역할</label><select id="fRole"><option>DEALER</option><option>DEFENDER</option></select></div>
+      <div class="field"><label>서브타이틀</label><input id="fSub" placeholder="예: 별칭 / 소속"></div>
+      <div class="field"><label>이미지</label><input id="fImg" type="file" accept="image/*"></div>
+    </div>
+    <div class="preview"><img id="imgPrev" alt="preview"><textarea id="fNote" placeholder="설명, 배경 등" style="flex:1;min-height:200px"></textarea></div>
+
+    <hr>
+    <h3>스탯</h3>
+    <div class="grid2">
+      <div class="field"><label>근력</label><input id="stStr" type="number" value="0"></div>
+      <div class="field"><label>내구</label><input id="stEnd" type="number" value="0"></div>
+      <div class="field"><label>민첩</label><input id="stAgi" type="number" value="0"></div>
+      <div class="field"><label>지력</label><input id="stInt" type="number" value="0"></div>
+      <div class="field"><label>마나/내력</label><input id="stMana" type="number" value="0"></div>
+      <div class="field"><label>행운</label><input id="stLuck" type="number" value="0"></div>
+    </div>
+
+    <hr>
+    <h3>장비</h3>
+    <div class="grid2">
+      <div class="field"><label>장갑</label><input id="eqGlove" placeholder="예: 가죽 장갑 +1"></div>
+      <div class="field"><label>바지</label><input id="eqPants" placeholder="예: 정장 바지"></div>
+      <div class="field"><label>셔츠</label><input id="eqShirt" placeholder="예: 회색 셔츠"></div>
+      <div class="field"><label>신발</label><input id="eqBoots" placeholder="예: 로퍼"></div>
+      <div class="field"><label>무기</label><input id="eqWeapon" placeholder="예: 회중시계(비밀)"></div>
+    </div>
+
+    <hr>
+    <h3>스킬/특성</h3>
+    <div class="field">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="skillInput" placeholder="스킬 이름 입력 후 Enter" style="flex:1;min-width:200px">
+        <button class="btn outline" id="pickFromCodex"><i class="fa-solid fa-book"></i> 도감에서 추가</button>
+        <label class="btn outline" style="cursor:pointer">파일 업로드<input id="skillFile" type="file" accept=".json,.csv,.txt" hidden></label>
+      </div>
+      <div class="small">※ 도감(compendium.html)에 등록된 항목을 빠르게 추가할 수 있습니다.</div>
+    </div>
+    <div id="skillList"></div>
+
+    <hr>
+    <h3>타임라인</h3>
+    <div class="grid2">
+      <div class="field"><label>날짜</label><input id="tlDate" type="date"></div>
+      <div class="field"><label>내용</label><input id="tlText" placeholder="예: 길드 합류"></div>
+    </div>
+    <button id="tlAdd" class="btn outline">추가</button>
+    <div id="timelineWrap" class="small"></div>
+  </section>
+</div>
+
+<!-- Mini Codex Picker Modal -->
+<div id="codexModal" class="modal" role="dialog" aria-modal="true" aria-label="도감 선택">
+  <div class="sheet">
+    <aside class="sleft">
+      <strong style="font-family:'Cinzel',serif">도감</strong>
+      <button class="btn outline" data-type="all">전체</button>
+      <button class="btn outline" data-type="trait">특성</button>
+      <button class="btn outline" data-type="tech">기술</button>
+      <button class="btn outline" data-type="magic">마법</button>
+      <button class="btn outline" data-type="skill">스킬</button>
+      <button class="btn outline" data-type="authority">권능</button>
+      <button class="btn outline" data-type="blessing">가호</button>
+      <button class="btn outline" data-type="proficiency">숙련도</button>
+      <div style="height:1px;background:rgba(255,255,255,.08);margin:8px 0"></div>
+      <button class="btn" id="closePicker">닫기</button>
+    </aside>
+    <section class="sright">
+      <div class="srch">
+        <input id="cxQ" placeholder="검색(이름/태그/등급)" style="flex:1;min-width:220px">
+        <select id="cxRank"><option value="">등급 전체</option>
+          <option>EX</option><option>SSS</option><option>SS</option><option>S+</option><option>S</option>
+          <option>A++</option><option>A+</option><option>A</option><option>A-</option>
+          <option>B++</option><option>B+</option><option>B</option><option>B-</option>
+          <option>C++</option><option>C+</option><option>C</option><option>C-</option>
+          <option>D++</option><option>D+</option><option>D</option><option>D-</option>
+          <option>F++</option><option>F+</option><option>F</option><option>F-</option>
+        </select>
+        <select id="cxSort"><option value="name">가나다순</option><option value="rankDesc">등급(고→저)</option></select>
+      </div>
+      <div class="tags" id="cxTags"></div>
+      <div id="cxList" class="listc"></div>
+      <div class="bottom">
+        <div id="cxSelInfo" class="small">항목을 선택하면 상세가 보입니다.</div>
+        <button id="cxAdd" class="btn" disabled>추가</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const STORE='members.v1', REP='representativeId', CODEX='codex.v1';
+const STORE_OLD='memberData.v1'; // 호환을 위한 구키
+const S= {list: JSON.parse(localStorage.getItem(STORE)||'[]'), current:null, skills:[], timeline:[]};
+const els = id=>document.getElementById(id);
+const list = els('list'); const imgPrev = els('imgPrev');
+
+function migrateOldStore(){
+  try{
+    const old=JSON.parse(localStorage.getItem(STORE_OLD)||'[]');
+    if(Array.isArray(old) && old.length && (!S.list || !S.list.length)){
+      S.list=old;
+      localStorage.setItem(STORE, JSON.stringify(S.list));
+    }
+  }catch{}
+}
+function uid(){return Math.random().toString(36).slice(2,9)}
+
+function drawList(){ list.innerHTML=''; S.list.forEach(ch=>{ const el=document.createElement('div'); el.className='item'; const img=ch.img?`<img src="${ch.img}">`:`<img src="https://via.placeholder.com/300x200/2a2a2a/888?text=NO+IMAGE">`; el.innerHTML=img+`<div class="t"><strong>${ch.name||'제목없음'}</strong><div class="small">${ch.role||''}</div></div>`; el.onclick=()=>loadToForm(ch.id); list.appendChild(el); }); localStorage.setItem(STORE, JSON.stringify(S.list)); localStorage.setItem(STORE_OLD, JSON.stringify(S.list)); }
+
+function loadToForm(id){ const ch=S.list.find(v=>v.id===id); if(!ch) return; S.current=ch; S.skills=[...(ch.skills||[])]; S.timeline=[...(ch.timeline||[])];
+  els('fName').value=ch.name||''; els('fRole').value=ch.role||'DEALER'; els('fSub').value=ch.sub||''; els('fNote').value=ch.note||''; imgPrev.src=ch.img||''; 
+  const st=ch.stats||{}; els('stStr').value=st.str??st.atk??0; els('stEnd').value=st.end??st.def??0; els('stAgi').value=st.agi??st.spd??0; els('stInt').value=st.int??0; els('stMana').value=st.mana??st.hp??0; els('stLuck').value=st.luck??0;
+  els('eqGlove').value=ch.equip?.glove||''; els('eqPants').value=ch.equip?.pants||''; els('eqShirt').value=ch.equip?.shirt||''; els('eqBoots').value=ch.equip?.boots||''; els('eqWeapon').value=ch.equip?.weapon||''; drawSkills(); drawTimeline(); }
+
+function resetForm(){ S.current=null; ['fName','fSub','fNote','eqGlove','eqPants','eqShirt','eqBoots','eqWeapon','stStr','stEnd','stAgi','stInt','stMana','stLuck','tlText','tlDate'].forEach(id=>els(id).value=''); els('fRole').value='DEALER'; imgPrev.src=''; S.skills=[]; S.timeline=[]; drawSkills(); drawTimeline(); }
+
+function save(){ const d={ id:S.current?.id||uid(), name:els('fName').value.trim(), role:els('fRole').value, sub:els('fSub').value.trim(), note:els('fNote').value.trim(), img:imgPrev.src||'', skills:[...S.skills], timeline:[...S.timeline], stats:{ str:+els('stStr').value||0,end:+els('stEnd').value||0,agi:+els('stAgi').value||0,int:+els('stInt').value||0,mana:+els('stMana').value||0,luck:+els('stLuck').value||0, atk:+els('stStr').value||0,def:+els('stEnd').value||0,spd:+els('stAgi').value||0,hp:+els('stMana').value||0 }, equip:{glove:els('eqGlove').value.trim(),pants:els('eqPants').value.trim(),shirt:els('eqShirt').value.trim(),boots:els('eqBoots').value.trim(),weapon:els('eqWeapon').value.trim()} }; const i=S.list.findIndex(x=>x.id===d.id); if(i>=0) S.list[i]=d; else S.list.push(d); migrateOldStore();
+
+drawList(); alert('저장되었습니다.'); }
+
+function drawSkills(){ const box=els('skillList'); box.innerHTML=''; S.skills.forEach((s,i)=>{const p=document.createElement('span'); p.className='pill'; p.innerHTML=`<span>${s}</span><button data-i='${i}'>×</button>`; p.querySelector('button').onclick=e=>{S.skills.splice(+e.target.dataset.i,1); drawSkills()}; box.appendChild(p)}) }
+function drawTimeline(){ const w=els('timelineWrap'); w.innerHTML=(S.timeline.map(t=>`• ${t.date||''} – ${t.text||''}`).join('<br>'))||'<span class="small">(비어 있음)</span>'; }
+
+document.getElementById('newBtn').onclick=()=>resetForm();
+document.getElementById('saveBtn').onclick=()=>save();
+document.getElementById('setRepBtn').onclick=()=>{ if(!S.current){alert('대표로 지정할 캐릭터를 먼저 선택하세요.');return;} localStorage.setItem(REP,S.current.id); alert('대표 캐릭터로 지정되었습니다. main으로 돌아가면 중앙에 표시됩니다.'); };
+
+document.getElementById('fImg').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=> imgPrev.src=r.result; r.readAsDataURL(f)};
+
+const skillInput=document.getElementById('skillInput');
+skillInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=skillInput.value.trim(); if(v){ S.skills.push(v); skillInput.value=''; drawSkills(); } } });
+
+document.getElementById('skillFile').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{const text=r.result+''; let arr=[]; if(f.name.endsWith('.json')){ try{ const j=JSON.parse(text); arr=Array.isArray(j)?j:[] }catch{} } else { arr=text.split(/\r?\n|,|;/).map(s=>s.trim()).filter(Boolean) } S.skills.push(...arr); drawSkills();}; r.readAsText(f)};
+
+document.getElementById('tlAdd').onclick=()=>{const date=els('tlDate').value, text=els('tlText').value.trim(); if(!text) return; S.timeline.push({date,text}); drawTimeline(); els('tlText').value=''; };
+
+document.getElementById('exportBtn').onclick=()=>{ const blob=new Blob([JSON.stringify(S.list,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='members.json'; a.click(); URL.revokeObjectURL(a.href); };
+document.getElementById('importInput').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const arr=JSON.parse(r.result); if(Array.isArray(arr)){ S.list=arr; drawList(); alert('불러왔습니다.'); } }catch{ alert('JSON 형식이 아닙니다.'); } }; r.readAsText(f); };
+
+drawList();
+
+// ===== 도감 미니 팝업 =====
+const TYPE_LABELS={trait:'특성', tech:'기술', magic:'마법', skill:'스킬', authority:'권능', blessing:'가호', proficiency:'숙련도'};
+const RANK_ORDER=["EX","SSS","SS","S+","S","A++","A+","A","A-","B++","B+","B","B-","C++","C+","C","C-","D++","D+","D","D-","F++","F+","F","F-"]; const rankIndex=r=>{const i=RANK_ORDER.indexOf(r||''); return i<0?999:i};
+
+function loadCodex(){ try{ return JSON.parse(localStorage.getItem(CODEX)||'[]') }catch{ return [] } }
+
+const codexModal=els('codexModal'); const cxQ=els('cxQ'); const cxRank=els('cxRank'); const cxSort=els('cxSort'); const cxList=els('cxList'); const cxTags=els('cxTags'); const cxSelInfo=els('cxSelInfo'); const cxAdd=els('cxAdd');
+let cxData=[]; let cxFilterType='all'; let cxActiveTags=new Set(); let cxSelected=null;
+
+function buildCxTags(){ const map=new Map(); cxData.forEach(x=> (x.tags||'').split(/\s*,\s*/).forEach(t=>{ if(!t) return; const k=t.toLowerCase(); map.set(k,(map.get(k)||0)+1) })); const tags=[...map.entries()].sort((a,b)=> a[0].localeCompare(b[0],'ko')).slice(0,40); cxTags.innerHTML=''; tags.forEach(([t,c])=>{ const b=document.createElement('button'); b.className='tag'; b.textContent=`#${t}`; b.title=`${c}개`; if(cxActiveTags.has(t)) b.classList.add('active'); b.onclick=()=>{ if(cxActiveTags.has(t)) cxActiveTags.delete(t); else cxActiveTags.add(t); renderCxList(); }; cxTags.appendChild(b); }); }
+
+function filteredCx(){ const term=(cxQ.value||'').toLowerCase(); let arr=cxData.filter(x=> (cxFilterType==='all'||x.type===cxFilterType) && (x.name.toLowerCase().includes(term) || (x.tags||'').toLowerCase().includes(term) || (x.rank||'').toLowerCase().includes(term))); if(cxRank.value){ arr=arr.filter(x=> (x.rank||'')===cxRank.value) } if(cxActiveTags.size){ arr=arr.filter(x=>{ const tags=(x.tags||'').split(/\s*,\s*/).map(s=>s.toLowerCase()).filter(Boolean); for(const t of cxActiveTags){ if(tags.includes(t)) return true; } return false; }) } const s=cxSort.value; if(s==='name') arr.sort((a,b)=> a.name.localeCompare(b.name,'ko')); else if(s==='rankDesc') arr.sort((a,b)=> rankIndex(a.rank)-rankIndex(b.rank) || a.name.localeCompare(b.name,'ko')); return arr; }
+
+function renderCxList(){
+  const arr=filteredCx();
+  cxList.innerHTML='';
+  arr.forEach(x=>{ const card=document.createElement('div'); card.className='cardc'; if(cxSelected && (cxSelected.id? cxSelected.id===x.id : (cxSelected.name||'').toLowerCase()===(x.name||'').toLowerCase())) card.classList.add('selected'); card.onclick=()=>openDetail(x); card.innerHTML=`<div class='thc' style="background-image:url('${x.icon||''}')"></div><div class='meta'><div style='font-weight:700'>${x.name}${x.rank?` <span class=\"badge\" data-rank=\"${x.rank}\">${x.rank}</span>`:''}</div><div class='small'>${TYPE_LABELS[x.type]||x.type} · ${(x.tags||'')}</div></div>`; cxList.appendChild(card); }); if(!arr.length){ cxList.innerHTML='<div class="small">검색 결과가 없습니다.</div>'; }
+  if(cxSelected){ cxSelInfo.innerHTML = `<div class='detail'><img class='prev' src='${cxSelected.icon||''}' alt=''><div><strong>${cxSelected.name}${cxSelected.rank?` <span class=\"badge\" data-rank=\"${cxSelected.rank}\">${cxSelected.rank}</span>`:''}</strong><div class='small'>${TYPE_LABELS[cxSelected.type]||cxSelected.type} · ${(cxSelected.tags||'')}</div><div style='margin-top:6px'>${cxSelected.desc||''}</div></div></div>`; cxAdd.disabled=false; } else { cxSelInfo.textContent='항목을 선택하면 상세가 보입니다.'; cxAdd.disabled=true; }
+}
+
+function selectCx(x){ cxSelected=x; renderCxList(); cxAdd.disabled=false; }
+
+// 즉시 상세 오버레이
+function openDetail(x){
+  cxSelected = x;
+  const _scroll = cxList.scrollTop; // 선택 하이라이트 유지
+  renderCxList();
+  cxList.scrollTop = _scroll;
+
+  let ov = document.querySelector('.detailModal');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'detailModal';
+    ov.innerHTML = `<div class="detailBox">
+      <div class="detailHead"><strong id="ovTitle"></strong>
+        <div style="display:flex;gap:8px">
+          <button id=\"ovAdd\" class=\"btn\">추가</button>
+          <button id=\"ovClose\" class=\"btn outline\">닫기</button>
+        </div>
+      </div>
+      <div id=\"ovBody\"></div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.add('hidden'); });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape') ov.classList.add('hidden'); });
+  }
+  const title    = ov.querySelector('#ovTitle');
+  const body     = ov.querySelector('#ovBody');
+  const btnAdd   = ov.querySelector('#ovAdd');
+  const btnClose = ov.querySelector('#ovClose');
+
+  title.textContent = x.name || '상세';
+  body.innerHTML = `<div class='detailGrid'>
+      <img src='${x.icon||''}' alt=''>
+      <div>
+        <div style='font-weight:700;margin-bottom:4px'>${x.name||''}${x.rank?` <span class="badge" data-rank="${x.rank}">${x.rank}</span>`:''}</div>
+        <div class='small' style='margin-bottom:8px'>${TYPE_LABELS[x.type]||x.type}${x.tags?` · ${x.tags}`:''}</div>
+        <div>${x.desc||''}</div>
+      </div>
+    </div>`;
+  btnAdd.onclick = ()=>{ if(!S.skills.includes(x.name)) S.skills.push(x.name); drawSkills(); ov.classList.add('hidden'); };
+  btnClose.onclick = ()=> ov.classList.add('hidden');
+  ov.classList.remove('hidden');
+}
+
+function openPicker(){ cxData = loadCodex(); let patched=false; cxData.forEach(it=>{ if(!it.id){ it.id=uid(); patched=true; } }); if(patched){ localStorage.setItem(CODEX, JSON.stringify(cxData)); }
+  cxFilterType='all'; cxActiveTags.clear(); cxSelected=null; cxQ.value=''; cxRank.value=''; cxSort.value='name'; buildCxTags(); renderCxList(); cxAdd.disabled=true; codexModal.classList.add('show'); }
+function closePicker(){ codexModal.classList.remove('show'); }
+
+els('pickFromCodex').onclick=openPicker; els('closePicker').onclick=closePicker; codexModal.addEventListener('click',(e)=>{ if(e.target===codexModal) closePicker(); });
+['trait','tech','magic','skill','authority','blessing','proficiency','all'].forEach(t=>{ const btn=[...document.querySelectorAll(`.sleft [data-type='${t}']`)][0]; if(btn) btn.onclick=()=>{ cxFilterType=t; renderCxList(); } });
+[cxQ,cxRank,cxSort].forEach(el=> el.addEventListener('input',renderCxList));
+
+cxAdd.onclick=()=>{ if(!cxSelected) return; if(!S.skills.includes(cxSelected.name)) S.skills.push(cxSelected.name); drawSkills(); closePicker(); };
+// ===== 외부 JSON 파일 읽고/쓰기 (File System Access API) =====
+let dataFileHandle = null;
+async function openDataFile(){
+  try{
+    const [handle] = await window.showOpenFilePicker({types:[{description:'JSON', accept:{'application/json':['.json']}}]});
+    dataFileHandle = handle;
+    const file = await dataFileHandle.getFile();
+    const text = await file.text();
+    const arr = JSON.parse(text);
+    if(Array.isArray(arr)){
+      S.list = arr; drawList();
+      alert('외부 JSON에서 불러왔습니다. 이제 "데이터 저장"을 누르면 같은 파일에 저장됩니다.');
+    } else { alert('JSON 배열 형태가 아닙니다.'); }
+  }catch(err){ /* 취소 가능 */ }
+}
+async function saveToDataFile(){
+  try{
+    if(!dataFileHandle){
+      dataFileHandle = await window.showSaveFilePicker({suggestedName:'members.json', types:[{description:'JSON', accept:{'application/json':['.json']}}]});
+    }
+    const writable = await dataFileHandle.createWritable();
+    await writable.write(new Blob([JSON.stringify(S.list,null,2)],{type:'application/json'}));
+    await writable.close();
+    alert('외부 JSON 파일에 저장했습니다.');
+  }catch(err){ /* 취소 가능 */ }
+}
+const openBtn = document.getElementById('openDataBtn');
+const saveBtn = document.getElementById('saveDataBtn');
+if(openBtn) openBtn.onclick = openDataFile;
+if(saveBtn) saveBtn.onclick = saveToDataFile;
+</script>
+</body>
+</html>
