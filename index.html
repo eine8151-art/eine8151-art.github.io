@@ -10,7 +10,12 @@
     :root{--bg:#0f0f12;--panel:#1a1a20;--panel2:#141419;--text:#E8E6E3;--muted:#b7b3ad;--gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)}
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.1), transparent 70%),radial-gradient(900px 700px at 10% 20%, rgba(125,106,61,.12), transparent 60%),var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif;overflow:hidden}
+    body{
+      margin:0;
+      background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.1), transparent 70%),
+        radial-gradient(900px 700px at 10% 20%, rgba(125,106,61,.12), transparent 60%), var(--bg);color:var(--text);
+      font-family:'Noto Sans KR',system-ui,sans-serif;overflow:hidden
+    }
 
     .app{display:grid;grid-template-columns:320px 1fr 380px;grid-template-rows:64px 1fr 88px;grid-template-areas:"top top top" "left center right" "bottom bottom bottom";gap:16px;height:100%;padding:16px;position:relative}
     .stars{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.35) 1px, transparent 1px);background-size:40px 40px;filter:blur(.2px);opacity:.3;pointer-events:none}
@@ -124,3 +129,4 @@
   </script>
 </body>
 </html>
+
