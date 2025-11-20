@@ -3,19 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>main – Game-style Homepage</title>
+  <title>Home Page</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     :root{--bg:#0f0f12;--panel:#1a1a20;--panel2:#141419;--text:#E8E6E3;--muted:#b7b3ad;--gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)}
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{
-      margin:0;
-      background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.1), transparent 70%),
-        radial-gradient(900px 700px at 10% 20%, rgba(125,106,61,.12), transparent 60%), var(--bg);color:var(--text);
-      font-family:'Noto Sans KR',system-ui,sans-serif;overflow:hidden
-    }
+    body{margin:0;background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.1), transparent 70%),radial-gradient(900px 700px at 10% 20%, rgba(125,106,61,.12), transparent 60%),var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif;overflow:hidden}
 
     .app{display:grid;grid-template-columns:320px 1fr 380px;grid-template-rows:64px 1fr 88px;grid-template-areas:"top top top" "left center right" "bottom bottom bottom";gap:16px;height:100%;padding:16px;position:relative}
     .stars{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.35) 1px, transparent 1px);background-size:40px 40px;filter:blur(.2px);opacity:.3;pointer-events:none}
@@ -28,7 +23,13 @@
 
     .sidebar{grid-area:left;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:14px;overflow:auto}
     .profile{display:flex;gap:12px;align-items:center;padding:10px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
-    .avatar{width:46px;height:46px;border-radius:50%;background:linear-gradient(145deg,#3a3a46,#23232a);border:2px solid var(--gold2)}
+    .avatar{
+      width:46px;height:46px;border-radius:50%;
+      background:linear-gradient(145deg,#3a3a46,#23232a);
+      border:2px solid var(--gold2);
+      background-size:cover;
+      background-position:center;
+    }
     .name{font-weight:700}
     .section-title{margin:14px 6px 8px;color:var(--muted);font-size:.9rem;letter-spacing:.06em}
     .list{display:flex;flex-direction:column;gap:8px}
@@ -47,7 +48,13 @@
     .navbtn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 12px;min-width:90px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.02);cursor:pointer}
     .navbtn i{font-size:20px;color:var(--gold)}
 
-    @media(max-width:1100px){.app{grid-template-columns:1fr;grid-template-rows:64px auto auto 88px;grid-template-areas:"top" "center" "right" "bottom";overflow:auto}body{overflow:auto}.sidebar{display:none}.stage{min-height:520px}.rep{width:min(420px,70%);right:2%}}
+    @media(max-width:1100px){
+      .app{grid-template-columns:1fr;grid-template-rows:64px auto auto 88px;grid-template-areas:"top" "center" "right" "bottom";overflow:auto}
+      body{overflow:auto}
+      .sidebar{display:none}
+      .stage{min-height:520px}
+      .rep{width:min(420px,70%);right:2%}
+    }
   </style>
 </head>
 <body>
@@ -66,14 +73,24 @@
     </div>
 
     <aside class="sidebar">
-      <div class="profile"><div class="avatar"></div><div><div class="name">캐릭터 이름</div><div style="font-size:.9rem;color:var(--muted)">전직: 모험가</div></div></div>
+      <!-- 🔧 여기: 대표 캐릭터 정보를 반영할 수 있도록 id 추가 -->
+      <div class="profile">
+        <div class="avatar" id="profileAvatar"></div>
+        <div>
+          <div class="name" id="profileName">캐릭터 이름</div>
+          <div id="profileSub" style="font-size:.9rem;color:var(--muted)">전직: 모험가</div>
+        </div>
+      </div>
       <div class="section-title">공지사항</div>
-      <div class="list"><div class="item"><span>캐릭터 설정 안내</span><small style="color:var(--muted)">08:21</small></div><div class="item"><span>사이트 업데이트 로그</span><small style="color:var(--muted)">어제</small></div></div>
+      <div class="list">
+        <div class="item"><span>캐릭터 설정 안내</span><small style="color:var(--muted)">08:21</small></div>
+        <div class="item"><span>사이트 업데이트 로그</span><small style="color:var(--muted)">어제</small></div>
+      </div>
     </aside>
 
     <main class="stage" id="stage">
       <img id="repImg" class="rep" alt="대표 캐릭터">
-      <div class="speech" id="speech">반가워요! 오늘도 정말 좋은 아침이죠?</div>
+      <div class="speech" id="speech">나 너무 힘들다 ㅠㅠ 이거 왜이래 어렵냐 ㅠㅠ</div>
     </main>
 
     <section class="right">
@@ -103,30 +120,82 @@
   </div>
 
   <script>
-    // 대표 캐릭터 이미지 렌더 + 간단 효과
-    const STORE='members.v1'; const REP='representativeId';
-    const repImg=document.getElementById('repImg'); const stage=document.getElementById('stage');
+    // 대표 캐릭터 이미지/프로필 렌더 + 간단 효과
+    const STORE='members.v1';
+    const REP='representativeId';
+
+    const repImg       = document.getElementById('repImg');
+    const stage        = document.getElementById('stage');
+    const profileName  = document.getElementById('profileName');
+    const profileSub   = document.getElementById('profileSub');
+    const profileAvatar= document.getElementById('profileAvatar');
 
     function loadMembers(){
-      const a=localStorage.getItem(STORE); const b=localStorage.getItem('memberData.v1');
-      try{ return a?JSON.parse(a):(b?JSON.parse(b):[]) }catch{ return [] }
+      const a = localStorage.getItem(STORE);
+      const b = localStorage.getItem('memberData.v1'); // 구버전 호환
+      try{
+        return a ? JSON.parse(a) : (b ? JSON.parse(b) : []);
+      }catch{
+        return [];
+      }
     }
-    function chooseRep(){ const list=loadMembers(); const id=localStorage.getItem(REP); return list.find(x=>x.id===id)||list[0]||null }
+    function chooseRep(){
+      const list = loadMembers();
+      const id   = localStorage.getItem(REP);
+      return list.find(x=>x.id===id) || list[0] || null;
+    }
 
     function render(){
-      const rep=chooseRep();
-      if(rep && rep.img){ repImg.src=rep.img; repImg.style.display='block'; }
-      else { repImg.style.display='none'; }
+      const rep = chooseRep();
+
+      // 메인 중앙 큰 이미지
+      if(rep && rep.img){
+        repImg.src = rep.img;
+        repImg.style.display = 'block';
+      }else{
+        repImg.style.display = 'none';
+      }
+
+      // 🔧 왼쪽 상단 미니 프로필 반영
+      if(rep){
+        if(profileName) profileName.textContent = rep.name || '무명';
+        if(profileSub){
+          // 서브타이틀이 있으면 그대로, 없으면 역할을 전직처럼 표기
+          if(rep.sub && rep.sub.trim()){
+            profileSub.textContent = rep.sub;
+          }else if(rep.role){
+            profileSub.textContent = '전직: ' + rep.role;
+          }else{
+            profileSub.textContent = '전직: -';
+          }
+        }
+        if(profileAvatar){
+          if(rep.img){
+            profileAvatar.style.backgroundImage = `url('${rep.img}')`;
+          }else{
+            // 이미지 없으면 기본 그라디언트만
+            profileAvatar.style.backgroundImage = '';
+          }
+        }
+      }else{
+        // 대표 캐릭터가 전혀 없을 때 기본값
+        if(profileName) profileName.textContent = '캐릭터 없음';
+        if(profileSub)  profileSub.textContent  = 'member 페이지에서 캐릭터를 생성하세요';
+        if(profileAvatar) profileAvatar.style.backgroundImage = '';
+      }
     }
 
     stage.addEventListener('mousemove', e=>{
-      const r=stage.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
-      repImg.style.transform=`translate(${(x-.5)*18}px, ${(y-.5)*10}px)`;
+      const r = stage.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width;
+      const y = (e.clientY - r.top)  / r.height;
+      repImg.style.transform = `translate(${(x-.5)*18}px, ${(y-.5)*10}px)`;
     });
-    stage.addEventListener('mouseleave', ()=> repImg.style.transform='translate(0,0)');
+    stage.addEventListener('mouseleave', ()=>{
+      repImg.style.transform = 'translate(0,0)';
+    });
 
     render();
   </script>
 </body>
 </html>
-
