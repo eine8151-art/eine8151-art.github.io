@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Battle – 텍스트 전투</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f0f12;--panel:#18181f;--panel2:#121219;
+      --text:#e8e6e3;--muted:#b7b3ad;
+      --gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:radial-gradient(1000px 600px at 70% -10%,rgba(212,175,55,.12),transparent 70%),#050507;
+      color:var(--text);
+      font-family:'Noto Sans KR',system-ui,sans-serif;
+    }
+    a{color:inherit;text-decoration:none}
+
+    header{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,rgba(20,20,26,.9),rgba(20,20,26,.3));
+      position:sticky;top:0;z-index:5;
+    }
+    .btn{
+      padding:8px 12px;border-radius:10px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.04);
+      cursor:pointer;color:var(--text);
+      font-size:.9rem;
+    }
+    .btn.gold{
+      background:linear-gradient(180deg,var(--gold),var(--gold2));
+      color:#111;border:none;font-weight:700;
+    }
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+
+    .wrap{
+      display:grid;
+      grid-template-columns:280px minmax(0,1fr) 280px;
+      gap:14px;
+      padding:14px;
+    }
+    .card{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      min-height:0;
+    }
+    .sideTitle{
+      margin:0 0 8px;
+      font-size:1rem;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+
+    select{
+      width:100%;margin-bottom:8px;
+      background:#11141a;color:var(--text);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:8px;padding:8px;
+    }
+
+    .charbox{
+      display:flex;gap:10px;align-items:flex-start;
+    }
+    .charbox img{
+      width:72px;height:96px;border-radius:10px;
+      border:1px solid rgba(255,255,255,.18);
+      object-fit:cover;background:#111;
+    }
+    .char-meta{font-size:.85rem}
+    .char-meta strong{font-size:.95rem}
+    .small{font-size:.8rem;color:var(--muted)}
+
+    .statRow{
+      display:flex;justify-content:space-between;align-items:center;
+      font-size:.8rem;margin-top:2px;
+    }
+    .bar{
+      flex:1;margin:0 6px;
+      height:8px;border-radius:99px;
+      background:#0d0f14;border:1px solid rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+    .bar span{
+      display:block;height:100%;
+      background:linear-gradient(90deg,var(--gold),var(--gold2));
+      width:0%;
+    }
+
+    /* CENTER – battle */
+    .mainTitle{
+      margin:0 0 8px;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    .hpRow{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:6px;
+      font-size:.8rem;
+      margin-bottom:8px;
+    }
+    .hpBox{
+      padding:6px 8px;
+      background:#101018;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.1);
+    }
+    .hpBox strong{font-size:.9rem}
+    .hpBar{
+      margin-top:4px;
+      height:10px;border-radius:99px;
+      background:#1a1a22;border:1px solid rgba(255,255,255,.14);
+      overflow:hidden;
+    }
+    .hpBar span{
+      display:block;height:100%;
+      background:linear-gradient(90deg,#e53935,#d4af37);
+      width:100%;
+    }
+
+    .log{
+      margin-top:6px;
+      border-radius:10px;
+      background:#101019;
+      border:1px solid rgba(255,255,255,.12);
+      padding:8px;
+      font-size:.85rem;
+      height:260px;
+      overflow:auto;
+      line-height:1.4;
+      white-space:pre-line;
+    }
+    .turnTag{
+      color:var(--gold);font-weight:700;
+    }
+
+    .controls{
+      display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;
+    }
+
+    @media(max-width:1000px){
+      .wrap{
+        grid-template-columns:1fr;
+        grid-template-rows:auto auto auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong style="font-family:'Cinzel',serif;letter-spacing:.06em">BATTLE</strong>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn" href="index.html">← 메인</a>
+      <a class="btn" href="member.html">멤버</a>
+      <a class="btn" href="character.html">프로필</a>
+      <a class="btn" href="compendium.html">도감</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- LEFT: Player -->
+    <section class="card">
+      <h3 class="sideTitle">아군<span class="small">좌측 캐릭터</span></h3>
+      <select id="leftSel"></select>
+      <div id="leftInfo" class="charbox">
+        <img alt="left portrait">
+        <div class="char-meta small">캐릭터가 없습니다.</div>
+      </div>
+    </section>
+
+    <!-- CENTER: Battle -->
+    <section class="card">
+      <div class="mainTitle">
+        <h3 style="margin:0">텍스트 전투</h3>
+        <span id="turnInfo" class="small">전투 준비 중…</span>
+      </div>
+
+      <div class="hpRow">
+        <div class="hpBox">
+          <div><strong id="lName">-</strong> <span class="small">(아군)</span></div>
+          <div class="small">HP <span id="lHpText">0 / 0</span> · MP <span id="lMpText">0 / 0</span></div>
+          <div class="hpBar"><span id="lHpBar"></span></div>
+        </div>
+        <div class="hpBox">
+          <div><strong id="rName">-</strong> <span class="small">(적)</span></div>
+          <div class="small">HP <span id="rHpText">0 / 0</span> · MP <span id="rMpText">0 / 0</span></div>
+          <div class="hpBar"><span id="rHpBar"></span></div>
+        </div>
+      </div>
+
+      <div class="log" id="log">
+[안내] 좌/우 캐릭터를 선택하고 "전투 시작"을 눌러주세요.
+      </div>
+
+      <div class="controls">
+        <button id="startBtn" class="btn gold">전투 시작 / 리셋</button>
+        <button id="stepBtn" class="btn" disabled>한 턴 진행</button>
+        <button id="autoBtn" class="btn" disabled>자동 전투</button>
+      </div>
+    </section>
+
+    <!-- RIGHT: Enemy -->
+    <section class="card">
+      <h3 class="sideTitle">적군<span class="small">우측 캐릭터</span></h3>
+      <select id="rightSel"></select>
+      <div id="rightInfo" class="charbox">
+        <img alt="right portrait">
+        <div class="char-meta small">캐릭터가 없습니다.</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ===== 공통 스토리지 키 =====
+    const STORE = 'members.v1';
+    const CODEX = 'codex.v1';
+
+    const $ = s => document.querySelector(s);
+
+    function loadMembers(){
+      try{
+        const a = localStorage.getItem(STORE);
+        const b = localStorage.getItem('memberData.v1'); // 구버전 호환
+        return a ? JSON.parse(a) : (b ? JSON.parse(b) : []);
+      }catch(e){
+        console.error(e);
+        return [];
+      }
+    }
+    function loadCodex(){
+      try{
+        return JSON.parse(localStorage.getItem(CODEX) || '[]');
+      }catch{
+        return [];
+      }
+    }
+
+    // === 도감 특성 보정: character.html과 동일한 규칙 ===
+    const RANK_ORDER=[
+      "EX","SSS","SS","S+","S",
+      "A++","A+","A","A-",
+      "B++","B+","B","B-",
+      "C++","C+","C","C-",
+      "D++","D+","D","D-",
+      "F++","F+","F","F-"
+    ];
+    const rankIndex = r=>{
+      const i = RANK_ORDER.indexOf(r || '');
+      return i<0 ? 999 : i;
+    };
+
+    function collectSkillMods(ch){
+      const names = ch.skills || [];
+      const codex = loadCodex();
+      const set   = new Set(names.map(s => (s||'').toLowerCase()));
+      const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+      const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+
+      codex.forEach(e=>{
+        if(e.type === 'trait' && set.has((e.name||'').toLowerCase())){
+          const m = e.mod  || {};
+          const p = e.modP || {};
+          flat.str  += +(m.str  ?? m.atk  ?? 0);
+          flat.end  += +(m.end  ?? m.def  ?? 0);
+          flat.agi  += +(m.agi  ?? m.spd  ?? 0);
+          flat.int  += +(m.int  ?? 0);
+          flat.mana += +(m.mana ?? m.hp   ?? 0);
+          flat.luck += +(m.luck ?? 0);
+
+          pct.str   += +(p.str  ?? p.atk  ?? 0);
+          pct.end   += +(p.end  ?? p.def  ?? 0);
+          pct.agi   += +(p.agi  ?? p.spd  ?? 0);
+          pct.int   += +(p.int  ?? 0);
+          pct.mana  += +(p.mana ?? p.hp   ?? 0);
+          pct.luck  += +(p.luck ?? 0);
+        }
+      });
+      return {flat, pct};
+    }
+
+    function calcFinalStats(ch){
+      const base = ch.stats || {};
+      const mods = collectSkillMods(ch);
+      const out = {};
+      ["str","end","agi","int","mana","luck"].forEach(k=>{
+        const b = base[k] || 0;
+        const dFlat = mods.flat[k] || 0;
+        const dPct  = mods.pct[k]  || 0;
+        out[k] = b + dFlat + Math.round(b * (dPct/100));
+      });
+      // 파생 스탯
+      out.maxHp = 50 + out.end * 10;
+      out.maxMp = 10 + out.mana * 5;
+      out.atk   = out.str;
+      out.mag   = out.int;
+      out.spd   = out.agi;
+      out.luk   = out.luck;
+      return out;
+    }
+
+    // ===== 전역 상태 =====
+    const state = {
+      members: [],
+      leftId: null,
+      rightId: null,
+      battle: null
+    };
+
+    // ===== UI 렌더링 =====
+    function fillSelects(){
+      const leftSel  = $('#leftSel');
+      const rightSel = $('#rightSel');
+      leftSel.innerHTML  = '';
+      rightSel.innerHTML = '';
+
+      if(!state.members.length){
+        leftSel.innerHTML  = '<option>캐릭터 없음</option>';
+        rightSel.innerHTML = '<option>캐릭터 없음</option>';
+        return;
+      }
+      state.members.forEach((ch,idx)=>{
+        const opt1 = document.createElement('option');
+        opt1.value = ch.id;
+        opt1.textContent = ch.name || `캐릭터 ${idx+1}`;
+        leftSel.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = ch.id;
+        opt2.textContent = ch.name || `캐릭터 ${idx+1}`;
+        rightSel.appendChild(opt2);
+      });
+
+      // 기본값: 첫 번째 / 두 번째
+      state.leftId  = state.members[0]?.id || null;
+      state.rightId = state.members[1]?.id || state.members[0]?.id || null;
+      if(state.leftId)  leftSel.value  = state.leftId;
+      if(state.rightId) rightSel.value = state.rightId;
+
+      updateSideInfo('left');
+      updateSideInfo('right');
+    }
+
+    function updateSideInfo(side){
+      const isLeft = side === 'left';
+      const id   = isLeft ? state.leftId : state.rightId;
+      const info = isLeft ? $('#leftInfo') : $('#rightInfo');
+      const ch   = state.members.find(c=>c.id===id);
+
+      info.innerHTML = '';
+      const img  = document.createElement('img');
+      const meta = document.createElement('div');
+      meta.className = 'char-meta';
+
+      if(!ch){
+        img.alt = '';
+        meta.innerHTML = '<div class="small">캐릭터가 없습니다.</div>';
+      }else{
+        img.src = ch.img || 'https://via.placeholder.com/120x160/1d1f26/777?text=NO+IMAGE';
+        img.alt = ch.name || 'portrait';
+        const st = calcFinalStats(ch);
+        meta.innerHTML = `
+          <strong>${ch.name || '무명'}</strong>
+          <div class="small">${ch.role || '-'} / ${ch.sub || ''}</div>
+          <div class="statRow">
+            <span class="small">근력</span>
+            <div class="bar"><span style="width:${Math.min(100,st.str)}%"></span></div>
+            <span class="small">${st.str}</span>
+          </div>
+          <div class="statRow">
+            <span class="small">내구</span>
+            <div class="bar"><span style="width:${Math.min(100,st.end)}%"></span></div>
+            <span class="small">${st.end}</span>
+          </div>
+          <div class="statRow">
+            <span class="small">민첩</span>
+            <div class="bar"><span style="width:${Math.min(100,st.agi)}%"></span></div>
+            <span class="small">${st.agi}</span>
+          </div>
+          <div class="statRow">
+            <span class="small">지력</span>
+            <div class="bar"><span style="width:${Math.min(100,st.int)}%"></span></div>
+            <span class="small">${st.int}</span>
+          </div>
+          <div class="statRow">
+            <span class="small">마나</span>
+            <div class="bar"><span style="width:${Math.min(100,st.mana)}%"></span></div>
+            <span class="small">${st.mana}</span>
+          </div>
+          <div class="statRow">
+            <span class="small">행운</span>
+            <div class="bar"><span style="width:${Math.min(100,st.luck)}%"></span></div>
+            <span class="small">${st.luck}</span>
+          </div>
+        `;
+      }
+      info.appendChild(img);
+      info.appendChild(meta);
+    }
+
+    // ===== 전투 상태 생성 =====
+    function makeFighter(ch){
+      const s = calcFinalStats(ch);
+      return {
+        ch,
+        stats:s,
+        hp:s.maxHp,
+        mp:s.maxMp
+      };
+    }
+
+    function resetBattle(){
+      const leftCh  = state.members.find(c=>c.id===state.leftId);
+      const rightCh = state.members.find(c=>c.id===state.rightId);
+      const log = $('#log');
+
+      if(!leftCh || !rightCh){
+        log.textContent = '[에러] 양쪽 모두 캐릭터를 선택해야 합니다.';
+        return;
+      }
+
+      state.battle = {
+        turn:1,
+        left: makeFighter(leftCh),
+        right: makeFighter(rightCh),
+        finished:false
+      };
+
+      $('#lName').textContent = leftCh.name || '무명';
+      $('#rName').textContent = rightCh.name || '무명';
+
+      updateHpUi();
+      log.textContent =
+        `전투가 시작되었습니다!\n\n` +
+        `아군: ${leftCh.name || '무명'}\n` +
+        `적군: ${rightCh.name || '무명'}\n\n` +
+        `[전투 규칙]\n- 민첩이 높은 쪽이 먼저 행동합니다.\n- 근력/지력을 기준으로 물리/마법 공격을 선택합니다.\n- 행운은 명중률, 크리티컬 확률에 영향을 줍니다.\n`;
+
+      $('#turnInfo').textContent = '1턴 시작';
+      $('#stepBtn').disabled = false;
+      $('#autoBtn').disabled = false;
+    }
+
+    function updateHpUi(){
+      const b = state.battle;
+      if(!b) return;
+      const lHpPct = Math.max(0, Math.min(100, (b.hpLeftPct || (b.left.hp / b.left.stats.maxHp * 100))));
+      const rHpPct = Math.max(0, Math.min(100, (b.hpRightPct || (b.right.hp / b.right.stats.maxHp * 100))));
+
+      $('#lHpText').textContent = `${Math.max(0,b.left.hp)} / ${b.left.stats.maxHp}`;
+      $('#rHpText').textContent = `${Math.max(0,b.right.hp)} / ${b.right.stats.maxHp}`;
+      $('#lMpText').textContent = `${Math.max(0,b.left.mp)} / ${b.left.stats.maxMp}`;
+      $('#rMpText').textContent = `${Math.max(0,b.right.mp)} / ${b.right.stats.maxMp}`;
+      $('#lHpBar').style.width = `${lHpPct}%`;
+      $('#rHpBar').style.width = `${rHpPct}%`;
+    }
+
+    function appendLog(text){
+      const log = $('#log');
+      log.textContent += '\n' + text;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function randInt(min,max){
+      return Math.floor(Math.random()*(max-min+1))+min;
+    }
+
+    function pickSkillName(fighter, kind){
+      const skills = fighter.ch.skills || [];
+      if(!skills.length){
+        return kind === 'magic' ? '마법 공격' : '공격';
+      }
+      return skills[randInt(0, skills.length-1)];
+    }
+
+    function calcHitChance(att, def){
+      // 기본 80% + 민첩 차이 + 행운 보정
+      let base = 80 + (att.stats.spd - def.stats.spd)*0.5 + (att.stats.luk - def.stats.luk)*0.3;
+      return Math.max(10, Math.min(98, base));
+    }
+
+    function calcCritChance(att){
+      // 기본 10% + 행운 * 0.5
+      return Math.max(0, Math.min(80, 10 + att.stats.luk*0.5));
+    }
+
+    function doAttack(att, def){
+      // 공격 방식 결정: 근력 >= 지력 → 물리 / 반대면 마법
+      const useMagic = att.stats.mag > att.stats.atk && att.mp >= 10;
+      const kind = useMagic ? 'magic' : 'physical';
+
+      const hitChance  = calcHitChance(att, def);
+      const rollHit    = Math.random()*100;
+      if(rollHit > hitChance){
+        return `${att.ch.name || '무명'}의 공격! 그러나 빗나갔다… (명중률 ${hitChance.toFixed(1)}%)`;
+      }
+
+      const critChance = calcCritChance(att);
+      const isCrit     = (Math.random()*100) < critChance;
+
+      let dmgBase;
+      if(kind === 'magic'){
+        // 마법 피해: 지력 기반, 상대 지력으로 약간 감소
+        dmgBase = att.stats.mag*1.2 - def.stats.int*0.3;
+        att.mp = Math.max(0, att.mp - 10); // 간단히 마법은 MP 10 소모
+      }else{
+        // 물리 피해: 근력 기반, 상대 내구로 감소
+        dmgBase = att.stats.atk*1.1 - def.stats.end*0.4;
+      }
+      if(dmgBase < 1) dmgBase = 1;
+
+      if(isCrit){
+        dmgBase *= 1.5;
+      }
+
+      const variance = 0.85 + Math.random()*0.3; // ±15%
+      const finalDmg = Math.max(1, Math.round(dmgBase * variance));
+      def.hp = Math.max(0, def.hp - finalDmg);
+
+      const skillName = pickSkillName(att, useMagic ? 'magic' : 'physical');
+      let line = `${att.ch.name || '무명'}가 ${skillName}을(를) 사용했다! ${finalDmg} 피해.`;
+      line += isCrit ? ` (치명타! 확률 ${critChance.toFixed(1)}%)` : '';
+      return line;
+    }
+
+    function stepTurn(){
+      const b = state.battle;
+      if(!b || b.finished){
+        return;
+      }
+      const left  = b.left;
+      const right = b.right;
+
+      // 이미 한쪽이 쓰러졌다면 종료
+      if(left.hp <= 0 || right.hp <= 0){
+        endBattle();
+        return;
+      }
+
+      appendLog('\n────────────');
+      appendLog(`[턴 ${b.turn}]`);
+
+      // 턴 순서: 민첩 + 약간의 랜덤
+      const leftInit  = left.stats.spd  + randInt(0,5);
+      const rightInit = right.stats.spd + randInt(0,5);
+
+      const first  = leftInit >= rightInit ? left  : right;
+      const second = leftInit >= rightInit ? right : left;
+
+      const firstName  = first.ch.name  || '무명';
+      const secondName = second.ch.name || '무명';
+
+      appendLog(`선제권: ${leftInit >= rightInit ? '아군' : '적군'} (${leftInit} vs ${rightInit})`);
+
+      // 1번째 행동
+      appendLog(doAttack(first, second));
+      updateHpUi();
+      if(second.hp <= 0){
+        appendLog(`${secondName}은(는) 쓰러졌다!`);
+        endBattle();
+        b.turn++;
+        $('#turnInfo').textContent = `${b.turn-1}턴 종료 (전투 종료)`;
+        return;
+      }
+
+      // 2번째 행동
+      appendLog(doAttack(second, first));
+      updateHpUi();
+      if(first.hp <= 0){
+        appendLog(`${firstName}은(는) 쓰러졌다!`);
+        endBattle();
+        b.turn++;
+        $('#turnInfo').textContent = `${b.turn-1}턴 종료 (전투 종료)`;
+        return;
+      }
+
+      b.turn++;
+      $('#turnInfo').textContent = `${b.turn}턴 준비`;
+    }
+
+    function endBattle(){
+      const b = state.battle;
+      if(!b || b.finished) return;
+      b.finished = true;
+      $('#stepBtn').disabled = true;
+      $('#autoBtn').disabled = true;
+
+      const lh = b.left.hp, rh = b.right.hp;
+      if(lh > 0 && rh <= 0){
+        appendLog('\n★ 아군 승리!');
+      }else if(rh > 0 && lh <= 0){
+        appendLog('\n★ 적군 승리!');
+      }else{
+        appendLog('\n★ 양쪽 모두 쓰러졌다. 무승부!');
+      }
+    }
+
+    function autoBattle(){
+      const b = state.battle;
+      if(!b) return;
+      let safety = 50; // 최대 턴 수 제한
+      while(!b.finished && safety-- > 0){
+        stepTurn();
+      }
+    }
+
+    // ===== 이벤트 바인딩 =====
+    function init(){
+      state.members = loadMembers();
+
+      if(!state.members.length){
+        $('#log').textContent =
+          '[안내] 저장된 캐릭터가 없습니다.\nmember.html에서 캐릭터를 먼저 생성해 주세요.';
+        $('#startBtn').disabled = true;
+        return;
+      }
+
+      fillSelects();
+
+      $('#leftSel').addEventListener('change', e=>{
+        state.leftId = e.target.value;
+        updateSideInfo('left');
+      });
+      $('#rightSel').addEventListener('change', e=>{
+        state.rightId = e.target.value;
+        updateSideInfo('right');
+      });
+
+      $('#startBtn').addEventListener('click', ()=>{
+        resetBattle();
+      });
+      $('#stepBtn').addEventListener('click', ()=>{
+        stepTurn();
+      });
+      $('#autoBtn').addEventListener('click', ()=>{
+        autoBattle();
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
