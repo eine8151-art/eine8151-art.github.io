@@ -380,15 +380,34 @@
         if(profileAvatar) profileAvatar.style.backgroundImage = '';
       }
     }
-
     stage.addEventListener('mousemove', e=>{
       const r = stage.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width;
-      const y = (e.clientY - r.top)  / r.height;
-      repImg.style.transform = `translate(${(x-.5)*18}px, ${(y-.5)*10}px)`;
-    });
+      const x = (e.clientX - r.left) / r.width;   // 0 ~ 1
+      const y = (e.clientY - r.top)  / r.height;  // 0 ~ 1
+
+  // 화면 중심 기준으로 -0.5 ~ +0.5
+      const offsetX = x - 0.5;
+      const offsetY = y - 0.5;
+
+  // 마우스 위치에 따라 살짝 이동
+      const moveX = offsetX * 18;  // px
+      const moveY = offsetY * 10;  // px
+
+  // 기울기 각도 계산 (값은 취향대로 조절 가능)
+      const rotateY = offsetX * 18;      // 좌우 기울기 (y축 회전)
+      const rotateX = -offsetY * 12;     // 상하 기울기 (x축 회전, 위로 갈수록 뒤로 젖혀지게 -)
+
+  // 약간의 z축 튀어나옴
+      const translateZ = 18; // px
+
+      repImg.style.transform =
+        `translate3d(${moveX}px, ${moveY}px, ${translateZ}px) ` +
+        `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+});
+
     stage.addEventListener('mouseleave', ()=>{
-      repImg.style.transform = 'translate(0,0)';
+      // 중앙 원위치 + 기울기 리셋
+      repImg.style.transform = 'translate3d(0,0,0) rotateX(0deg) rotateY(0deg)';
     });
 
     render();
