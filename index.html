@@ -131,7 +131,9 @@
       overflow:hidden;
       border-radius:14px;
       border:1px solid rgba(255,255,255,.06);
-      perspective: 1200px;
+      perspective: 350px;
+      transform-style: preserve-3d;
+      transition: transform 0.1s;
       background:radial-gradient(600px 300px at 50% 0%, rgba(212,175,55,.18), rgba(20,20,26,.0) 60%), linear-gradient(180deg, var(--panel), var(--panel2))
     }
 
@@ -157,6 +159,22 @@
       transform-style: preserve-3d;
       transform-origin: center bottom;
       transition:transform .12s ease-out
+    }
+
+    .rep-overlay{
+      position:absolute;
+      inset:0;
+      background:linear-gradient(105deg,
+      transparent 40%,
+    rgba(255, 219, 112, 0.8) 45%,
+    rgba(132, 50, 255 ,0.6) 50%,
+      transparent 54%);
+      filter:brightness(1.1) opacity(0);
+      mix-blend-mode:color-dodge;
+      background-size:150% 150%;
+      background-position:100%;
+      pointer-events:none;
+      transition:all 0.1s;
     }
 
     .right{
@@ -278,9 +296,12 @@
     </aside>
 
     <main class="stage" id="stage">
-      <img id="repImg" class="rep" alt="대표 캐릭터">
-      <div class="speech" id="speech">나 너무 힘들다 ㅠㅠ 이거 왜이래 어렵냐 ㅠㅠ</div>
-    </main>
+    <!-- ✨ 빛 반사용 오버레이 -->
+    <div class="rep-overlay" id="repOverlay"></div>
+
+    <img id="repImg" class="rep" alt="대표 캐릭터">
+    <div class="speech" id="speech">나 너무 힘들다 ㅠㅠ 이거 왜이래 어렵냐 ㅠㅠ</div>
+  </main>
 
     <section class="right">
       <article class="card" onclick="location.href='member.html'">
@@ -380,37 +401,37 @@
         if(profileAvatar) profileAvatar.style.backgroundImage = '';
       }
     }
-    stage.addEventListener('mousemove', e=>{
-      const r = stage.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width;   // 0 ~ 1
-      const y = (e.clientY - r.top)  / r.height;  // 0 ~ 1
+    const overlay = document.getElementById('repOverlay');
 
-  // 화면 중심 기준으로 -0.5 ~ +0.5
-      const offsetX = x - 0.5;
-      const offsetY = y - 0.5;
+stage.addEventListener('mousemove', function(e){
+  const rect = stage.getBoundingClientRect();
+  // stage 내부에서의 마우스 위치 (px)
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
 
-  // 마우스 위치에 따라 살짝 이동
-      const moveX = offsetX * 18;  // px
-      const moveY = offsetY * 10;  // px
+  // 기울기 각도 계산 (예제 코드 값 그대로 사용)
+  const rotateY = -1/5 * x + 20;
+  const rotateX =  4/30 * y - 20;
 
-  // 기울기 각도 계산 (값은 취향대로 조절 가능)
-      const rotateY = offsetX * 18;      // 좌우 기울기 (y축 회전)
-      const rotateX = -offsetY * 12;     // 상하 기울기 (x축 회전, 위로 갈수록 뒤로 젖혀지게 -)
+  // 빛 반사 오버레이 효과
+  if (overlay){
+    const pos = (x/5 + y/5); // 배경 이동
+    overlay.style.backgroundPosition = pos + '%';
+    overlay.style.filter = `opacity(${x/200}) brightness(1.2)`;
+  }
 
-  // 약간의 z축 튀어나옴
-      const translateZ = 18; // px
-
-      repImg.style.transform =
-        `translate3d(${moveX}px, ${moveY}px, ${translateZ}px) ` +
-        `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+  // 전체 스테이지 기울기 적용
+  stage.style.transform =
+    `perspective(350px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
 });
 
-    stage.addEventListener('mouseleave', ()=>{
-      // 중앙 원위치 + 기울기 리셋
-      repImg.style.transform = 'translate3d(0,0,0) rotateX(0deg) rotateY(0deg)';
-    });
-
-    render();
+stage.addEventListener('mouseout', function(){
+  if (overlay){
+    overlay.style.filter = 'opacity(0)';  // 빛 효과 사라지기
+  }
+  stage.style.transform =
+    'perspective(350px) rotateY(0deg) rotateX(0deg)';  // 원위치
+});
   </script>
 </body>
 </html>
