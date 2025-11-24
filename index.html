@@ -151,14 +151,13 @@
     }
 
     .rep{
-      position:absolute;
-      right:6%;
-      bottom:0;
-      width:min(520px,48%);
-      filter:drop-shadow(0 40px 60px rgba(0,0,0,.55));
-      transform-style: preserve-3d;
-      transform-origin: center bottom;
-      transition:transform .12s ease-out
+      width: 380px !important;   /* 원하는 고정 크기, 340~420px 추천 */
+      height: auto;
+      right: 50% !important;      /* 정확히 가운데 기준 */
+      bottom: 0;
+      transform: translateX(50%); /* 가운데 정렬 */
+      max-width: 100%;            /* 혹시라도 stage보다 커지지 않도록 */
+      pointer-events:none;        /* 마우스 효과에 방해되지 않도록 */
     }
 
     .rep-overlay{
