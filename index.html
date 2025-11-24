@@ -400,36 +400,38 @@
         if(profileAvatar) profileAvatar.style.backgroundImage = '';
       }
     }
-    const overlay = document.getElementById('repOverlay');
+    stage.addEventListener('mousemove', function(e){
+  // 대표 이미지 없으면 아무 효과도 실행되지 않음
+  if (repImg.style.display === 'none') return;
 
-stage.addEventListener('mousemove', function(e){
   const rect = stage.getBoundingClientRect();
-  // stage 내부에서의 마우스 위치 (px)
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  // 기울기 각도 계산 (예제 코드 값 그대로 사용)
   const rotateY = -1/5 * x + 20;
   const rotateX =  4/30 * y - 20;
 
-  // 빛 반사 오버레이 효과
-  if (overlay){
-    const pos = (x/5 + y/5); // 배경 이동
-    overlay.style.backgroundPosition = pos + '%';
-    overlay.style.filter = `opacity(${x/200}) brightness(1.2)`;
-  }
+  // 대표 캐릭터만 기울이기
+  repImg.style.transform =
+    `translateX(50%) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
 
-  // 전체 스테이지 기울기 적용
-  stage.style.transform =
-    `perspective(350px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+  // overlay도 동일한 각도로 보조
+  overlay.style.transform =
+    `translateX(50%) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+
+  // overlay 반짝임 효과는 약하게 clamp
+  const pos = (x/5 + y/5);
+  overlay.style.backgroundPosition = pos + '%';
+  overlay.style.filter = `opacity(${Math.min(0.6, x/300)}) brightness(1.15)`;
 });
 
 stage.addEventListener('mouseout', function(){
-  if (overlay){
-    overlay.style.filter = 'opacity(0)';  // 빛 효과 사라지기
-  }
-  stage.style.transform =
-    'perspective(350px) rotateY(0deg) rotateX(0deg)';  // 원위치
+  if (repImg.style.display === 'none') return;
+
+  repImg.style.transform =
+    'translateX(50%) rotateX(0deg) rotateY(0deg)';
+  
+  overlay.style.filter = 'opacity(0)';
 });
   </script>
 </body>
