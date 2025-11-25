@@ -6,14 +6,53 @@
   <title>Compendium – 도감 (신규 스탯 체계)</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0f0f12;--panel:#18181f;--panel2:#121219;--text:#e8e6e3;--muted:#b7b3ad;--gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)}
-    *{box-sizing:border-box}
-    body{margin:0;background:radial-gradient(1000px 600px at 70% -10%, rgba(212,175,55,.12), transparent 70%),var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif}
-    a{color:inherit;text-decoration:none}
+    :root{--bg:#0f0f12;
+      --panel:#18181f;
+      --panel2:#121219;
+      --text:#e8e6e3;
+      --muted:#b7b3ad;
+      --gold:#d4af37;
+      --gold2:#b8922b;
+      --card:rgba(212,175,55,.35)
+    }
 
-    .wrap{display:grid;grid-template-columns:240px 1fr;gap:14px;padding:16px}
-    .side{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
-    .main{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;position:relative}
+    *{
+      box-sizing:border-box
+    }
+
+    body{
+      margin:0;
+      background:radial-gradient(1000px 600px at 70% -10%, rgba(212,175,55,.12), transparent 70%),var(--bg);
+      color:var(--text);
+      font-family:'Noto Sans KR',system-ui,sans-serif
+    }
+
+    a{
+      color:inherit;
+      text-decoration:none
+    }
+
+    .wrap{
+      display:grid;
+      grid-template-columns:240px 1fr;
+      gap:14px;
+      padding:16px
+    }
+
+    .side{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:14px
+    }
+
+    .main{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:14px;
+      position:relative
+    }
 
     .menu{display:flex;flex-direction:column;gap:8px}
     .mbtn{padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.02);cursor:pointer;text-align:left}
@@ -175,7 +214,7 @@
           <div class="statrow"><span>내구</span><div class="bar"><span></span></div><input id="mEnd" type="number" value="0"><input id="mEndP" type="number" step="0.1" value="0" placeholder="%"></div>
           <div class="statrow"><span>민첩</span><div class="bar"><span></span></div><input id="mAgi" type="number" value="0"><input id="mAgiP" type="number" step="0.1" value="0" placeholder="%"></div>
           <div class="statrow"><span>지력</span><div class="bar"><span></span></div><input id="mInt" type="number" value="0"><input id="mIntP" type="number" step="0.1" value="0" placeholder="%"></div>
-          <div class="statrow"><span>마나/내력</span><div class="bar"><span></span></div><input id="mMana" type="number" value="0"><input id="mManaP" type="number" step="0.1" value="0" placeholder="%"></div>
+          <div class="statrow"><span>자원</span><div class="bar"><span></span></div><input id="mMana" type="number" value="0"><input id="mManaP" type="number" step="0.1" value="0" placeholder="%"></div>
           <div class="statrow"><span>행운</span><div class="bar"><span></span></div><input id="mLuck" type="number" value="0"><input id="mLuckP" type="number" step="0.1" value="0" placeholder="%"></div>
         </div>
         <p style="color:var(--muted);margin-top:6px">※ 스탯 보정은 "특성" 종류에서만 사용됩니다. (±, % 모두 지원) — <small>기존 키(atk/def/spd/hp)와도 자동 호환</small></p>
@@ -186,12 +225,22 @@
   <script>
     const KEY='codex.v1';
     const $=s=>document.querySelector(s);
-    const listEl=$('#list'); const emptyEl=$('#empty'); const drawer=$('#drawer');
-    const q=$('#q'); const importInput=$('#importInput'); const sortSel=$('#sortSel'); const rankSel=$('#rankSel'); const clearBtn=$('#clearBtn');
+    const listEl=$('#list'); 
+    const emptyEl=$('#empty'); 
+    const drawer=$('#drawer');
+    const q=$('#q'); 
+    const importInput=$('#importInput'); 
+    const sortSel=$('#sortSel'); 
+    const rankSel=$('#rankSel'); 
+    const clearBtn=$('#clearBtn');
     const tagChips=$('#tagChips');
 
-    const TYPE_LABELS={trait:'특성', tech:'기술', magic:'마법', skill:'스킬', authority:'권능', blessing:'가호', proficiency:'숙련도'};
-    const RANK_ORDER=["EX","SSS","SS","S+","S","A++","A+","A","A-","B++","B+","B","B-","C++","C+","C","C-","D++","D+","D","D-","F++","F+","F","F-"];
+    const TYPE_LABELS={
+      trait:'특성', tech:'기술', magic:'마법', skill:'스킬', authority:'권능', blessing:'가호', proficiency:'숙련도'
+    };
+    const RANK_ORDER=[
+      "EX","SSS","SS","S+","S","A++","A+","A","A-","B++","B+","B","B-","C++","C+","C","C-","D++","D+","D","D-","F++","F+","F","F-"
+    ];
     const rankIndex = r=>{ const i=RANK_ORDER.indexOf(r||''); return i<0?999:i };
 
     const f={ type:$('#fType'), name:$('#fName'), icon:$('#fIcon'), iconFile:$('#fIconFile'), iconPrev:$('#iconPreview'), desc:$('#fDesc'), tags:$('#fTags'), rank:$('#fRank'),
