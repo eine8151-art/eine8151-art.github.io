@@ -6,21 +6,114 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
-:root{--bg:#0f0f12;--panel:#18181f;--panel2:#121219;--text:#e8e6e3;--muted:#b7b3ad;--gold:#d4af37;--gold2:#b8922b;--card:rgba(212,175,55,.35)}
-*{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.1), transparent 70%),var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif}
-.header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
-.btn{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#111;border:none;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}
-.btn.outline{background:transparent;color:var(--text);border:1px solid rgba(212,175,55,.4)}
-.wrap{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
-.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
-.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.item{border:1px solid var(--card);border-radius:10px;overflow:hidden;background:#1e1e26;cursor:pointer;transition:.2s}
-.item:hover{transform:translateY(-2px);box-shadow:0 10px 20px rgba(0,0,0,.35)}
-.item img{width:100%;height:160px;object-fit:cover}
-.item .t{padding:8px;text-align:center}
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-input,select,textarea{background:#11141a;color:var(--text);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  :root{--bg:#0f0f12;
+    --panel:#18181f;
+    --panel2:#121219;
+    --text:#e8e6e3;
+    --muted:#b7b3ad;
+    --gold:#d4af37;
+    --gold2:#b8922b;
+    --card:rgba(212,175,55,.35)
+  }
+  
+  *{
+    box-sizing:border-box
+  } body{
+    margin:0;
+    background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.1), transparent 70%),var(--bg);
+    color:var(--text);
+    font-family:'Noto Sans KR',sans-serif
+  }
+  
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 16px;
+    border-bottom:1px solid rgba(255,255,255,.08)
+  }
+  
+  .btn{
+    background:linear-gradient(180deg,var(--gold),var(--gold2));
+    color:#111;
+    border:none;
+    border-radius:10px;
+    padding:10px 14px;
+    font-weight:800;
+    cursor:pointer
+  }
+  
+  .btn.outline{
+    background:transparent;
+    color:var(--text);
+    border:1px solid rgba(212,175,55,.4)
+  }
+  
+  .wrap{
+    display:grid;
+    grid-template-columns:360px 1fr;
+    gap:16px;
+    padding:16px
+  }
+  
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;
+    padding:14px
+  }
+  
+  .list{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+    gap:10px
+  }
+  
+  .item{
+    border:1px solid var(--card);
+    border-radius:10px;
+    overflow:hidden;
+    background:#1e1e26;
+    cursor:pointer;
+    transition:.2s
+  }
+  
+  .item:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 20px rgba(0,0,0,.35)
+  }
+  
+  .item img{
+    width:100%;
+    height:160px;
+    object-fit:cover
+  }
+  
+  .item .t{
+    padding:8px;
+    text-align:center
+  }
+  
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-bottom:10px
+  }
+  
+  input,select,textarea{
+    background:#11141a;
+    color:var(--text);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:8px;
+    padding:10px
+  }
+  
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px
+  }
 .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(212,175,55,.35);margin:4px 6px 0 0}
 .pill button{background:none;border:none;color:var(--muted);cursor:pointer}
 hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
@@ -64,7 +157,27 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
 .detailBox{width:min(560px,92vw);max-height:80vh;overflow:auto;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px}
 .detailHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .detailGrid{display:grid;grid-template-columns:120px 1fr;gap:12px}
-.detailGrid img{width:120px;height:120px;border-radius:10px;border:1px solid var(--card);object-fit:cover;background:#1a1d25}
+  .detailGrid img{
+    width:120px;
+    height:120px;
+    border-radius:10px;
+    border:1px solid var(--card);
+    object-fit:cover;
+    background:#1a1d25
+    }
+
+    /* === 리스트 우선 모드용 === */
+  .wrap.list-only{
+    grid-template-columns: 1fr;  /* 리스트만 한 줄로 */
+  }
+
+  .wrap.list-only > .card:first-child{
+    grid-column: 1 / -1;         /* 첫 번째 카드(리스트)가 전체 너비 사용 */
+  }
+
+  .hidden{
+    display: none !important;    /* 편집 카드 숨길 때 사용 */
+  }
 </style>
 </head>
 <body>
@@ -234,6 +347,19 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
 
   const listEl  = $id('list');
   const imgPrev = $id('imgPrev');
+  const wrapEl   = document.querySelector('.wrap');
+  const editorEl = document.querySelector('.wrap > .card:nth-of-type(2)');
+
+  function setViewMode(mode){
+    if (!wrapEl || !editorEl) return;
+    if (mode === 'edit'){
+      wrapEl.classList.remove('list-only');
+      editorEl.classList.remove('hidden');
+    } else { // 'list'
+      wrapEl.classList.add('list-only');
+      editorEl.classList.add('hidden');
+    }
+  }
 
   // ===== 기본 로딩 / 저장 =====
   function loadInitialMembers() {
@@ -296,7 +422,10 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
           <div class="small">${ch.role || '역할 미지정'}</div>
         </div>
       `;
-      item.onclick = () => loadToForm(ch.id);
+      item.onclick = () => {
+        loadToForm(ch.id);
+        setViewMode('edit');   // 캐릭터 클릭 → 편집 화면으로
+      };
       listEl.appendChild(item);
     });
 
@@ -307,6 +436,8 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
   function loadToForm(id) {
     const ch = S.list.find(v => v.id === id);
     if (!ch) return;
+
+    setViewMode('edit'); // 어디에서 호출하든, 캐릭터를 불러오면 편집 모드
 
     S.currentId = id;
     S.skills    = Array.isArray(ch.skills)   ? [...ch.skills]   : [];
@@ -677,7 +808,10 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
 
   // ===== 초기 바인딩 =====
   function bindEvents() {
-    $id('newBtn').onclick    = resetForm;
+    $id('newBtn').onclick    = () => {
+      resetForm();
+      setViewMode('edit');    // 새 캐릭터 생성도 편집 화면으로
+    };
     $id('saveBtn').onclick   = save;
     $id('setRepBtn').onclick = () => {
       if (!S.currentId) {
@@ -893,6 +1027,7 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
     loadInitialMembers();
     bindEvents();
     drawList();
+    setViewMode('list');  // 처음엔 등록된 캐릭터들만 보여주기
   })();
 </script>
 </body>
