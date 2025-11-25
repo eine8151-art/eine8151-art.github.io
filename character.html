@@ -265,6 +265,34 @@
     .badge[data-rank^="F"]{background:rgba(176,190,197,.18);color:#e0e6e9}
 
     ul{margin:0;padding-left:18px}
+
+    .charSwitchItem{
+      width:70px;
+      text-align:center;
+      cursor:pointer;
+      flex-shrink:0;
+    }
+
+    .charSwitchItem img{
+      width:70px;
+      height:70px;
+      border-radius:50%;
+      object-fit:cover;
+      border:2px solid transparent;
+      transition: .15s;
+    }
+
+    .charSwitchItem span{
+      display:block;
+      margin-top:4px;
+      font-size:.78rem;
+      color:var(--muted);
+    }
+
+    .charSwitchItem.active img{
+      border-color:var(--gold);
+      box-shadow:0 0 6px rgba(212,175,55,.45);
+    }
   </style>
 </head>
 <body>
@@ -297,6 +325,15 @@
 
       <h3 style="margin:16px 0 8px">스킬/특성</h3>
       <div id="skillWrap" class="skills"></div>
+
+      <!-- ▼ 캐릭터 전환 바 -->
+      <div id="charSwitch" style="margin-top:20px; padding-top:16px; border-top:1px solid rgba(255,255,255,.08);">
+        <h4 style="margin:0 0 10px; font-size:1rem;">캐릭터 전환</h4>
+        <div id="charSwitchList" 
+            style="display:flex; gap:14px; overflow-x:auto; padding-bottom:10px;">
+        </div>
+      </div>
+      <!-- ▲ 캐릭터 전환 바 -->
     </section>
 
     <!-- RIGHT: Equip & Timeline -->
@@ -842,7 +879,40 @@
 
         skillWrap.appendChild(box);
       });
+      /* -------- 스킬/특성 렌더 끝 -------- */
+
+      // ▼ 캐릭터 전환 바 렌더링
+      renderCharacterSwitcher(ch.id);
     }
+
+    /* -----------------------------------------
+      * 캐릭터 전환 바 렌더링
+      * ----------------------------------------- */
+      function renderCharacterSwitcher(currentId){
+        const list = loadMembers();
+        const box  = document.getElementById("charSwitchList");
+        if(!box) return;
+
+        box.innerHTML = "";
+
+        list.forEach(ch=>{
+          const item = document.createElement("div");
+          item.className = "charSwitchItem";
+          if(ch.id === currentId) item.classList.add("active");
+
+          item.innerHTML = `
+            <img src="${ch.img || 'https://via.placeholder.com/100x100/1d1f26/777?text=NO'}">
+            <span>${ch.name || '무명'}</span>
+          `;
+
+          item.onclick = () => {
+            // 현재 페이지에서 다른 캐릭터로 이동
+            location.href = `character.html?id=${ch.id}`;
+          };
+
+          box.appendChild(item);
+        });
+      }
 
     /* =========================================================
      *  차트 모드(막대형 / 방사형) 설정 및 토글 버튼
