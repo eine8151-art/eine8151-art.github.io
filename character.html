@@ -170,23 +170,46 @@
       return row;
     }
 
-    // 특성/숙련도/권능만 항상 스탯에 반영
+// 특성/숙련도/권능만 항상 스탯에 반영
 const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']);
 
+// 이름이 같은 항목이 여러 개 있을 때
+// → 같은 이름에서는 "가장 높은 등급(랭크)" 하나만 적용하도록 변경
 function collectSkillMods(ch){
   const names = ch.skills || [];
   const codex = loadCodex();
-  const set   = new Set((names || []).map(s => (s || '').toLowerCase()));
+  const wanted = new Set((names || []).map(s => (s || '').toLowerCase()));
+
   const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
   const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
 
-  codex.forEach(e=>{
-    if (!ALWAYS_ON_TYPES.has(e.type)) return;                    // ★ 종류 필터
-    if (!set.has((e.name || '').toLowerCase())) return;          // ★ 캐릭터가 가진 이름인지
+  // 1) 이름별로 가장 좋은(랭크가 높은) 항목 하나만 고르기
+  const pickedByName = new Map();
 
+  codex.forEach(e => {
+    if (!ALWAYS_ON_TYPES.has(e.type)) return;            // 특성/숙련도/권능만
+    const key = (e.name || '').toLowerCase();
+    if (!wanted.has(key)) return;                        // 캐릭터가 가진 이름이 아니면 스킵
+
+    const prev = pickedByName.get(key);
+    if (!prev) {
+      pickedByName.set(key, e);
+    } else {
+      // rankIndex가 작을수록 상위 등급
+      const rNew = rankIndex(e.rank || '');
+      const rOld = rankIndex(prev.rank || '');
+      if (rNew < rOld) {
+        pickedByName.set(key, e);
+      }
+    }
+  });
+
+  // 2) 선택된 항목들만 모아서 스탯 보정 합산
+  pickedByName.forEach(e => {
     const m = e.mod  || {};
     const p = e.modP || {};
 
+    // 고정값
     flat.str  += +(m.str  ?? m.atk  ?? 0);
     flat.end  += +(m.end  ?? m.def  ?? 0);
     flat.agi  += +(m.agi  ?? m.spd  ?? 0);
@@ -194,6 +217,7 @@ function collectSkillMods(ch){
     flat.mana += +(m.mana ?? m.hp   ?? 0);
     flat.luck += +(m.luck ?? 0);
 
+    // % 보정
     pct.str   += +(p.str  ?? p.atk  ?? 0);
     pct.end   += +(p.end  ?? p.def  ?? 0);
     pct.agi   += +(p.agi  ?? p.spd  ?? 0);
