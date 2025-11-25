@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Inventory – 인벤토리</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f0f12;
+      --panel:#18181f;
+      --panel2:#121219;
+      --text:#e8e6e3;
+      --muted:#b7b3ad;
+      --gold:#d4af37;
+      --gold2:#b8922b;
+      --card:rgba(212,175,55,.35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:
+        radial-gradient(1000px 600px at 70% -10%,rgba(212,175,55,.12),transparent 70%),
+        #050507;
+      color:var(--text);
+      font-family:'Noto Sans KR',system-ui,sans-serif;
+    }
+    a{color:inherit;text-decoration:none}
+
+    header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,rgba(20,20,26,.9),rgba(20,20,26,.3));
+      position:sticky;
+      top:0;
+      z-index:5;
+    }
+    .btn{
+      padding:8px 12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.04);
+      cursor:pointer;
+      color:var(--text);
+      font-size:.9rem;
+    }
+    .btn.gold{
+      background:linear-gradient(180deg,var(--gold),var(--gold2));
+      color:#111;
+      border:none;
+      font-weight:700;
+    }
+    .btn:disabled{
+      opacity:.5;
+      cursor:not-allowed;
+    }
+
+    .wrap{
+      display:grid;
+      grid-template-columns:220px minmax(0,1.4fr) 280px;
+      gap:14px;
+      padding:14px;
+    }
+    .card{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      min-height:0;
+    }
+    .sideTitle{
+      margin:0 0 8px;
+      font-size:1rem;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+    .small{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+
+    /* LEFT – 카테고리 필터 */
+    .catList{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .catBtn{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.02);
+      font-size:.9rem;
+      cursor:pointer;
+      transition:.15s;
+    }
+    .catBtn span:last-child{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+    .catBtn:hover{
+      background:rgba(255,255,255,.05);
+    }
+    .catBtn.active{
+      border-color:var(--card);
+      box-shadow:0 0 0 1px rgba(212,175,55,.35);
+      background:rgba(255,255,255,.06);
+    }
+
+    /* CENTER – 아이템 리스트 */
+    .toolbar{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin-bottom:8px;
+      flex-wrap:wrap;
+    }
+    .toolbar input[type="search"]{
+      flex:1;
+      min-width:180px;
+      background:#11141a;
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:8px;
+      padding:7px 9px;
+      font-size:.9rem;
+    }
+    .toolbar select{
+      background:#11141a;
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:8px;
+      padding:7px 9px;
+      font-size:.85rem;
+    }
+
+    .itemGrid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+      gap:10px;
+      max-height:480px;
+      overflow:auto;
+    }
+    .itemCard{
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.02);
+      padding:8px 9px;
+      cursor:pointer;
+      transition:.15s;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      font-size:.85rem;
+    }
+    .itemCard:hover{
+      transform:translateY(-2px);
+      box-shadow:0 10px 18px rgba(0,0,0,.3);
+    }
+    .itemCard.active{
+      border-color:var(--card);
+      box-shadow:0 0 0 1px rgba(212,175,55,.4);
+    }
+    .itemNameRow{
+      display:flex;
+      justify-content:space-between;
+      gap:4px;
+      align-items:center;
+    }
+    .itemNameRow strong{
+      font-size:.93rem;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .badge{
+      display:inline-block;
+      min-width:22px;
+      text-align:center;
+      font-size:.7rem;
+      border-radius:999px;
+      padding:1px 6px;
+      border:1px solid rgba(212,175,55,.45);
+      color:#e9e1c9;
+    }
+    .badge[data-rarity="일반"]{border-color:rgba(176,190,197,.6);}
+    .badge[data-rarity="고급"]{background:rgba(100,181,246,.18);}
+    .badge[data-rarity="희귀"]{background:rgba(102,187,106,.18);}
+    .badge[data-rarity="영웅"]{background:rgba(212,175,55,.2);}
+    .badge[data-rarity="전설"]{background:rgba(255,202,40,.25);}
+
+    .tagline{
+      font-size:.78rem;
+      color:var(--muted);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .qty{
+      font-size:.78rem;
+      color:var(--muted);
+      text-align:right;
+    }
+
+    /* RIGHT – 상세/편집 폼 */
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      font-size:.85rem;
+      margin-bottom:6px;
+    }
+    .field label{
+      color:var(--muted);
+    }
+    input[type="text"],
+    input[type="number"],
+    textarea,
+    select{
+      background:#11141a;
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:8px;
+      padding:7px 9px;
+      font-size:.9rem;
+    }
+    textarea{
+      min-height:90px;
+      resize:vertical;
+    }
+    .btnRow{
+      display:flex;
+      gap:8px;
+      margin-top:6px;
+      flex-wrap:wrap;
+    }
+    .btn.danger{
+      border-color:rgba(239,83,80,.6);
+      color:#ffb3b3;
+    }
+
+    .placeholder{
+      border:1px dashed rgba(255,255,255,.18);
+      border-radius:10px;
+      padding:10px;
+      font-size:.85rem;
+      color:var(--muted);
+      line-height:1.5;
+      margin-top:4px;
+    }
+
+    @media(max-width:1000px){
+      .wrap{
+        grid-template-columns:1fr;
+        grid-template-rows:auto auto auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong style="font-family:'Cinzel',serif;letter-spacing:.06em">INVENTORY</strong>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn" href="index.html">← 메인</a>
+      <a class="btn" href="member.html">멤버</a>
+      <a class="btn" href="character.html">프로필</a>
+      <a class="btn" href="equipment.html">장비</a>
+      <a class="btn" href="battle.html">전투</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- LEFT: 카테고리 필터 -->
+    <section class="card">
+      <h3 class="sideTitle">
+        카테고리
+        <span class="small">클릭하여 필터</span>
+      </h3>
+      <div id="catList" class="catList"></div>
+      <div class="small" style="margin-top:8px">
+        분류:<br>
+        • 무기, 방어구, 소모품, 재료, 기타<br>
+        • 아이템마다 1개의 기본 분류를 갖습니다.
+      </div>
+    </section>
+
+    <!-- CENTER: 아이템 리스트 -->
+    <section class="card">
+      <div class="toolbar">
+        <input id="searchInput" type="search" placeholder="아이템 이름 / 태그 검색">
+        <select id="sortSel">
+          <option value="name">이름순</option>
+          <option value="rarity">등급순</option>
+          <option value="qtyDesc">수량(많은 순)</option>
+        </select>
+        <button id="newBtn" class="btn gold">+ 새 아이템</button>
+        <button id="exportBtn" class="btn">내보내기</button>
+        <label class="btn">
+          불러오기
+          <input id="importInput" type="file" accept="application/json" hidden>
+        </label>
+      </div>
+
+      <div id="itemGrid" class="itemGrid"></div>
+      <div id="noItems" class="small" style="margin-top:6px;display:none">
+        아직 등록된 아이템이 없습니다. <strong>오른쪽에서 새 아이템을 추가</strong>해 주세요.
+      </div>
+    </section>
+
+    <!-- RIGHT: 상세 / 편집 -->
+    <aside class="card">
+      <h3 style="margin:0 0 6px;font-size:1rem">아이템 상세</h3>
+      <div id="detailForm">
+        <div class="field">
+          <label for="fName">이름</label>
+          <input id="fName" type="text" placeholder="예: 장검">
+        </div>
+        <div class="field">
+          <label for="fCategory">분류</label>
+          <select id="fCategory">
+            <option value="weapon">무기</option>
+            <option value="armor">방어구</option>
+            <option value="consumable">소모품</option>
+            <option value="material">재료</option>
+            <option value="misc">기타</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fRarity">등급</label>
+          <select id="fRarity">
+            <option value="일반">일반</option>
+            <option value="고급">고급</option>
+            <option value="희귀">희귀</option>
+            <option value="영웅">영웅</option>
+            <option value="전설">전설</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fQty">수량</label>
+          <input id="fQty" type="number" min="0" value="1">
+        </div>
+        <div class="field">
+          <label for="fTags">태그</label>
+          <input id="fTags" type="text" placeholder="예: 양손, 장비, 검">
+        </div>
+        <div class="field">
+          <label for="fNote">설명</label>
+          <textarea id="fNote" placeholder="아이템 설명, 효과 등"></textarea>
+        </div>
+
+        <div class="btnRow">
+          <button id="saveBtn" class="btn gold">저장</button>
+          <button id="deleteBtn" class="btn danger">삭제</button>
+        </div>
+
+        <div class="placeholder" id="hintBox">
+          • 한 아이템은 하나의 기본 분류(무기/방어구/소모품/재료/기타)를 가집니다.<br>
+          • 태그를 활용해 <strong>전투 전용 / 상점 전용 / 퀘스트 재료</strong> 등 세부 구분을 할 수 있습니다.<br>
+          • 나중에 <strong>전투(battle.html)</strong>이나 <strong>장비(equipment.html)</strong>와 연결해서
+          아이템 효과를 계산하는 기반으로 쓸 수 있습니다.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const INV_KEY = 'inventory.v1';
+
+    const $ = s => document.querySelector(s);
+
+    const state = {
+      items: [],
+      currentId: null,
+      filter: 'all',
+      q: '',
+      sort: 'name'
+    };
+
+    const CATEGORY_LABEL = {
+      all: '전체',
+      weapon: '무기',
+      armor: '방어구',
+      consumable: '소모품',
+      material: '재료',
+      misc: '기타'
+    };
+
+    const RARITY_ORDER = ['전설','영웅','희귀','고급','일반'];
+
+    function uid(){
+      return Math.random().toString(36).slice(2, 9);
+    }
+
+    function loadInventory(){
+      try{
+        const raw = localStorage.getItem(INV_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        state.items = Array.isArray(arr) ? arr : [];
+      }catch(e){
+        console.error(e);
+        state.items = [];
+      }
+    }
+
+    function saveInventory(){
+      try{
+        localStorage.setItem(INV_KEY, JSON.stringify(state.items));
+      }catch(e){
+        console.error('인벤토리 저장 오류', e);
+        alert('인벤토리를 저장하는 도중 오류가 발생했습니다. 브라우저 저장소 용량을 확인해 주세요.');
+      }
+    }
+
+    function countByCategory(){
+      const counts = {weapon:0, armor:0, consumable:0, material:0, misc:0};
+      state.items.forEach(it=>{
+        if(counts[it.category]) counts[it.category]++; else counts.misc++;
+      });
+      return counts;
+    }
+
+    function renderCategories(){
+      const box = $('#catList');
+      box.innerHTML = '';
+
+      const counts = countByCategory();
+      const cats = ['all','weapon','armor','consumable','material','misc'];
+
+      cats.forEach(c=>{
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'catBtn' + (state.filter === c ? ' active' : '');
+        const count =
+          c === 'all'
+            ? state.items.length
+            : (counts[c] || 0);
+
+        btn.innerHTML = `
+          <span>${CATEGORY_LABEL[c]}</span>
+          <span>${count}개</span>
+        `;
+        btn.onclick = ()=>{
+          state.filter = c;
+          renderCategories();
+          renderList();
+        };
+        box.appendChild(btn);
+      });
+    }
+
+    function filteredSortedItems(){
+      let arr = state.items.slice();
+
+      if(state.filter !== 'all'){
+        arr = arr.filter(it => it.category === state.filter);
+      }
+
+      const term = (state.q || '').toLowerCase();
+      if(term){
+        arr = arr.filter(it=>{
+          const name = (it.name||'').toLowerCase();
+          const tags = (it.tags||'').toLowerCase();
+          const note = (it.note||'').toLowerCase();
+          return name.includes(term) || tags.includes(term) || note.includes(term);
+        });
+      }
+
+      if(state.sort === 'name'){
+        arr.sort((a,b)=>
+          (a.name||'').localeCompare(b.name||'', 'ko')
+        );
+      }else if(state.sort === 'rarity'){
+        arr.sort((a,b)=>{
+          const ai = RARITY_ORDER.indexOf(a.rarity||'일반');
+          const bi = RARITY_ORDER.indexOf(b.rarity||'일반');
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) ||
+                 (a.name||'').localeCompare(b.name||'', 'ko');
+        });
+      }else if(state.sort === 'qtyDesc'){
+        arr.sort((a,b)=> (b.qty||0) - (a.qty||0) ||
+          (a.name||'').localeCompare(b.name||'', 'ko')
+        );
+      }
+
+      return arr;
+    }
+
+    function renderList(){
+      const grid = $('#itemGrid');
+      const no   = $('#noItems');
+      grid.innerHTML = '';
+
+      const arr = filteredSortedItems();
+      if(!arr.length){
+        no.style.display = 'block';
+        return;
+      }
+      no.style.display = 'none';
+
+      arr.forEach(it=>{
+        const card = document.createElement('div');
+        card.className = 'itemCard' + (it.id === state.currentId ? ' active' : '');
+        const rarity = it.rarity || '일반';
+        const catLabel = CATEGORY_LABEL[it.category] || '기타';
+
+        card.innerHTML = `
+          <div class="itemNameRow">
+            <strong title="${it.name||''}">${it.name || '이름 없음'}</strong>
+            <span class="badge" data-rarity="${rarity}">${rarity}</span>
+          </div>
+          <div class="tagline">
+            ${catLabel}
+            ${it.tags ? ' · ' + it.tags : ''}
+          </div>
+          <div class="qty">x ${it.qty ?? 0}</div>
+        `;
+        card.onclick = ()=>{
+          state.currentId = it.id;
+          renderList();
+          loadToForm();
+        };
+        grid.appendChild(card);
+      });
+    }
+
+    function loadToForm(){
+      const it = state.items.find(x=>x.id === state.currentId);
+      const nameEl = $('#fName');
+      const catEl  = $('#fCategory');
+      const rarEl  = $('#fRarity');
+      const qtyEl  = $('#fQty');
+      const tagsEl = $('#fTags');
+      const noteEl = $('#fNote');
+
+      if(!it){
+        nameEl.value = '';
+        catEl.value  = 'weapon';
+        rarEl.value  = '일반';
+        qtyEl.value  = 1;
+        tagsEl.value = '';
+        noteEl.value = '';
+        return;
+      }
+
+      nameEl.value = it.name || '';
+      catEl.value  = it.category || 'weapon';
+      rarEl.value  = it.rarity || '일반';
+      qtyEl.value  = it.qty ?? 1;
+      tagsEl.value = it.tags || '';
+      noteEl.value = it.note || '';
+    }
+
+    function saveCurrent(){
+      const name = $('#fName').value.trim();
+      if(!name){
+        alert('아이템 이름을 입력해 주세요.');
+        return;
+      }
+
+      const id = state.currentId || uid();
+      const existingIndex = state.items.findIndex(x=>x.id === id);
+
+      const item = {
+        id,
+        name,
+        category: $('#fCategory').value,
+        rarity:   $('#fRarity').value,
+        qty:      +($('#fQty').value || 0),
+        tags:     $('#fTags').value.trim(),
+        note:     $('#fNote').value.trim()
+      };
+
+      if(existingIndex >= 0){
+        state.items[existingIndex] = item;
+      }else{
+        state.items.push(item);
+      }
+      state.currentId = id;
+      saveInventory();
+      renderCategories();
+      renderList();
+      alert('아이템이 저장되었습니다.');
+    }
+
+    function newItem(){
+      state.currentId = null;
+      $('#fName').value = '';
+      $('#fCategory').value = state.filter !== 'all' ? state.filter : 'weapon';
+      $('#fRarity').value = '일반';
+      $('#fQty').value = 1;
+      $('#fTags').value = '';
+      $('#fNote').value = '';
+      renderList();
+    }
+
+    function deleteCurrent(){
+      if(!state.currentId){
+        alert('삭제할 아이템이 선택되어 있지 않습니다.');
+        return;
+      }
+      const it = state.items.find(x=>x.id === state.currentId);
+      if(!it) return;
+
+      if(!confirm(`"${it.name}" 아이템을 삭제할까요?`)) return;
+
+      state.items = state.items.filter(x=>x.id !== state.currentId);
+      state.currentId = null;
+      saveInventory();
+      renderCategories();
+      renderList();
+      newItem();
+    }
+
+    function exportInv(){
+      const blob = new Blob([JSON.stringify(state.items,null,2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'inventory.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function importInv(file){
+      const r = new FileReader();
+      r.onload = ()=>{
+        try{
+          const arr = JSON.parse(r.result);
+          if(Array.isArray(arr)){
+            state.items = arr;
+            state.currentId = null;
+            saveInventory();
+            renderCategories();
+            renderList();
+            newItem();
+            alert('인벤토리를 불러왔습니다.');
+          }else{
+            alert('JSON 배열 형식이 아닙니다.');
+          }
+        }catch(e){
+          console.error(e);
+          alert('JSON 파싱에 실패했습니다.');
+        }
+      };
+      r.readAsText(file);
+    }
+
+    function bindEvents(){
+      $('#newBtn').onclick = newItem;
+      $('#saveBtn').onclick = saveCurrent;
+      $('#deleteBtn').onclick = deleteCurrent;
+      $('#exportBtn').onclick = exportInv;
+
+      $('#importInput').onchange = e=>{
+        const f = e.target.files && e.target.files[0];
+        if(f) importInv(f);
+        e.target.value = '';
+      };
+
+      $('#searchInput').addEventListener('input', e=>{
+        state.q = e.target.value;
+        renderList();
+      });
+
+      $('#sortSel').addEventListener('change', e=>{
+        state.sort = e.target.value;
+        renderList();
+      });
+    }
+
+    function init(){
+      loadInventory();
+      bindEvents();
+      renderCategories();
+      renderList();
+      newItem();
+    }
+
+    init();
+  </script>
+</body>
+</html>

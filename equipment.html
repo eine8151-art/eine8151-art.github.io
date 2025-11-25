@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Equipment – 장비 관리</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f0f12;
+      --panel:#18181f;
+      --panel2:#121219;
+      --text:#e8e6e3;
+      --muted:#b7b3ad;
+      --gold:#d4af37;
+      --gold2:#b8922b;
+      --card:rgba(212,175,55,.35)
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:
+        radial-gradient(1000px 600px at 70% -10%,rgba(212,175,55,.12),transparent 70%),
+        #050507;
+      color:var(--text);
+      font-family:'Noto Sans KR',system-ui,sans-serif;
+    }
+    a{color:inherit;text-decoration:none}
+
+    header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,rgba(20,20,26,.9),rgba(20,20,26,.3));
+      position:sticky;
+      top:0;
+      z-index:5;
+    }
+    .btn{
+      padding:8px 12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.04);
+      cursor:pointer;
+      color:var(--text);
+      font-size:.9rem;
+    }
+    .btn.gold{
+      background:linear-gradient(180deg,var(--gold),var(--gold2));
+      color:#111;
+      border:none;
+      font-weight:700;
+    }
+    .btn:disabled{
+      opacity:.5;
+      cursor:not-allowed;
+    }
+
+    .wrap{
+      display:grid;
+      grid-template-columns:280px minmax(0,1fr) 260px;
+      gap:14px;
+      padding:14px;
+    }
+    .card{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px 14px;
+      min-height:0;
+    }
+    .sideTitle{
+      margin:0 0 8px;
+      font-size:1rem;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+    .small{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+
+    /* LEFT – 캐릭터 리스트 */
+    .charList{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-height:540px;
+      overflow:auto;
+    }
+    .charItem{
+      display:flex;
+      gap:8px;
+      padding:6px 8px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.06);
+      background:rgba(255,255,255,.02);
+      cursor:pointer;
+      transition:.15s;
+      align-items:center;
+    }
+    .charItem:hover{
+      background:rgba(255,255,255,.04);
+      transform:translateY(-1px);
+    }
+    .charItem.active{
+      border-color:var(--card);
+      box-shadow:0 0 0 1px rgba(212,175,55,.35);
+    }
+    .charItem img{
+      width:40px;
+      height:40px;
+      border-radius:10px;
+      object-fit:cover;
+      background:#111;
+      border:1px solid rgba(255,255,255,.18);
+      flex-shrink:0;
+    }
+    .charMeta{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+    .charMeta strong{
+      font-size:.9rem;
+    }
+    .charMeta span{
+      font-size:.78rem;
+      color:var(--muted);
+    }
+
+    /* CENTER – 장비 편집 */
+    .charHeader{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      margin-bottom:10px;
+    }
+    .charHeader img{
+      width:90px;
+      height:120px;
+      border-radius:10px;
+      object-fit:cover;
+      border:1px solid rgba(255,255,255,.16);
+      background:#111;
+    }
+    .charHeaderInfo{
+      flex:1;
+    }
+    .charHeaderInfo h2{
+      margin:0;
+      font-size:1.3rem;
+    }
+    .charHeaderInfo .sub{
+      margin-top:2px;
+      font-size:.9rem;
+      color:var(--muted);
+    }
+
+    .equipGrid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:8px;
+    }
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      font-size:.85rem;
+    }
+    .field label{
+      color:var(--muted);
+    }
+    input[type="text"]{
+      background:#11141a;
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:8px;
+      padding:8px;
+      font-size:.9rem;
+    }
+
+    .hint{
+      margin-top:8px;
+      font-size:.8rem;
+      color:var(--muted);
+    }
+
+    .equipSummary{
+      margin-top:10px;
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px dashed rgba(255,255,255,.16);
+      font-size:.85rem;
+      color:var(--muted);
+      background:rgba(0,0,0,.18);
+    }
+
+    /* RIGHT – 인벤토리 / 향후 확장용 */
+    .invList{
+      margin-top:6px;
+      font-size:.85rem;
+      color:var(--muted);
+    }
+    .invPlaceholder{
+      border:1px dashed rgba(255,255,255,.15);
+      border-radius:10px;
+      padding:10px;
+      margin-top:8px;
+      font-size:.8rem;
+      line-height:1.5;
+    }
+    .invCategoryHead{
+      margin-top:6px;
+      font-size:.8rem;
+      color:var(--muted);
+      font-weight:600;
+    }
+    .invItemRow{
+      margin-left:4px;
+      padding:2px 0;
+      display:flex;
+      flex-direction:column;
+    }
+    .invItemName{
+      font-size:.85rem;
+    }
+    .invItemMeta{
+      font-size:.75rem;
+      color:var(--muted);
+    }
+
+    @media(max-width:1000px){
+      .wrap{
+        grid-template-columns:1fr;
+        grid-template-rows:auto auto auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong style="font-family:'Cinzel',serif;letter-spacing:.06em">EQUIPMENT</strong>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn" href="index.html">← 메인</a>
+      <a class="btn" href="member.html">멤버</a>
+      <a class="btn" href="character.html">프로필</a>
+      <a class="btn" href="compendium.html">도감</a>
+      <a class="btn" href="battle.html">전투</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- LEFT: 캐릭터 목록 -->
+    <section class="card">
+      <h3 class="sideTitle">
+        캐릭터 목록
+        <span class="small">클릭하여 장비 편집</span>
+      </h3>
+      <div id="charList" class="charList"></div>
+      <div id="noChars" class="small" style="margin-top:6px;display:none">
+        저장된 캐릭터가 없습니다. <strong>member.html</strong>에서 먼저 캐릭터를 생성해주세요.
+      </div>
+    </section>
+
+    <!-- CENTER: 장비 편집 -->
+    <section class="card">
+      <div class="charHeader">
+        <img id="viewImg" alt="portrait">
+        <div class="charHeaderInfo">
+          <h2 id="viewName">캐릭터 없음</h2>
+          <div class="sub" id="viewRole">역할 / 소속</div>
+          <div class="small" id="viewNote"></div>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:8px 0 10px">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h3 style="margin:0;font-size:1rem">장비 편집</h3>
+        <button id="saveBtn" class="btn gold">현재 캐릭터 장비 저장</button>
+      </div>
+
+      <div class="equipGrid">
+        <div class="field">
+          <label for="eqGlove">장갑</label>
+          <input id="eqGlove" type="text" placeholder="예: 가죽 장갑 +1">
+        </div>
+        <div class="field">
+          <label for="eqPants">바지</label>
+          <input id="eqPants" type="text" placeholder="예: 전투용 바지">
+        </div>
+        <div class="field">
+          <label for="eqShirt">셔츠 / 상의</label>
+          <input id="eqShirt" type="text" placeholder="예: 강화 셔츠">
+        </div>
+        <div class="field">
+          <label for="eqBoots">신발</label>
+          <input id="eqBoots" type="text" placeholder="예: 장화 / 부츠">
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+          <label for="eqWeapon">무기</label>
+          <input id="eqWeapon" type="text" placeholder="예: 장검, 지팡이, 권총 등">
+        </div>
+      </div>
+
+      <div class="hint">
+        • 여기서 저장한 장비는 <strong>member.html</strong>과 <strong>character.html</strong>에서 바로 반영됩니다.<br>
+        • 장비별 수치 보정은 나중에 "아이템 도감"과 연동해서 추가할 수 있습니다.
+      </div>
+
+      <div class="equipSummary" id="equipSummary">
+        현재 선택된 캐릭터가 없습니다. 왼쪽에서 캐릭터를 선택하면 장비 내용을 요약해서 보여줍니다.
+      </div>
+    </section>
+
+    <!-- RIGHT: 인벤토리 / 향후 확장 -->
+    <aside class="card">
+      <h3 class="sideTitle">
+        인벤토리
+        <span class="small">상점 연동</span>
+      </h3>
+      <div class="invList" id="invList">
+        <!-- JS에서 카테고리별로 렌더링 -->
+      </div>
+      <div class="invPlaceholder" id="invEmptyHint">
+        • 상점(shop.html)에서 선택한 캐릭터로 구매한 아이템이<br>
+        &nbsp;&nbsp;여기에 <strong>소비 아이템 / 장비 / 기타</strong>로 나뉘어 표시됩니다.<br><br>
+        • 나중에는 슬롯 클릭 → 아이템 선택 → 장비에 장착하는 기능으로 확장할 수 있습니다.<br>
+        • 전투 페이지(battle.html)의 계산에 장비 보정 수치를 반영하는 것도 가능합니다.
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===== 공통 스토리지 키 (기존 멤버/전투/프로필 페이지와 동일) =====
+    const STORE     = 'members.v1';
+    const STORE_OLD = 'memberData.v1';
+
+    // 상점 인벤토리 데이터 (bag.v1)와 연동
+    const BAG_KEY   = 'bag.v1';
+
+    const $ = s => document.querySelector(s);
+
+    const state = {
+      members: [],
+      currentId: null
+    };
+
+    function loadMembers(){
+      try{
+        const cur = localStorage.getItem(STORE);
+        const old = localStorage.getItem(STORE_OLD);
+        const parsed = cur ? JSON.parse(cur) : (old ? JSON.parse(old) : []);
+        return Array.isArray(parsed) ? parsed : [];
+      }catch(e){
+        console.error(e);
+        return [];
+      }
+    }
+
+    function saveMembers(){
+      try{
+        const str = JSON.stringify(state.members);
+        localStorage.setItem(STORE, str);
+        localStorage.setItem(STORE_OLD, str); // 구버전 키도 함께 유지
+      }catch(e){
+        console.error('멤버 저장 오류', e);
+        alert('저장 중 오류가 발생했습니다. 이미지 용량 또는 브라우저 저장소 용량을 확인해주세요.');
+      }
+    }
+
+    // ===== 인벤토리(bag.v1) 연동 =====
+    function loadBag(){
+      try{
+        const raw = localStorage.getItem(BAG_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      }catch(e){
+        console.error('bag 로드 오류', e);
+        return [];
+      }
+    }
+
+    function getCurrentCharItems(){
+      const bag = loadBag();
+      const chId = state.currentId;
+      if(!chId) return [];
+      // 해당 캐릭터가 구매한 아이템만
+      return bag.filter(e => e.ownerId === chId);
+    }
+
+    function renderInventory(){
+      const box  = document.getElementById('invList');
+      const hint = document.getElementById('invEmptyHint');
+      if(!box) return;
+
+      box.innerHTML = '';
+
+      const ch = state.members.find(c => c.id === state.currentId);
+      if(!ch){
+        box.innerHTML = '<div class="small">왼쪽에서 캐릭터를 선택하면 인벤토리가 표시됩니다.</div>';
+        if(hint) hint.style.display = 'block';
+        return;
+      }
+
+      const items = getCurrentCharItems();
+      if(!items.length){
+        box.innerHTML = '<div class="small">아직 이 캐릭터가 상점에서 구매한 아이템이 없습니다.</div>';
+        if(hint) hint.style.display = 'block';
+        return;
+      }
+
+      if(hint) hint.style.display = 'none';
+
+      // type 기준으로 그룹 만들기 (없으면 기타)
+      const groups = { '소비': [], '장비': [], '기타': [] };
+      items.forEach(e => {
+        const t = e.type || '기타';
+        if(!groups[t]) groups[t] = [];
+        groups[t].push(e);
+      });
+
+      const order = ['소비', '장비', '기타'];
+
+      order.forEach(key => {
+        const arr = groups[key];
+        if(!arr || !arr.length) return;
+
+        const head = document.createElement('div');
+        head.className = 'invCategoryHead';
+        head.textContent =
+          key === '소비' ? '소비 아이템'
+        : key === '장비' ? '장비'
+        : '기타';
+        box.appendChild(head);
+
+        // 이름순 정렬
+        arr.sort((a,b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+
+        arr.forEach(e => {
+          const row = document.createElement('div');
+          row.className = 'invItemRow';
+          row.innerHTML = `
+            <span class="invItemName">${e.name || '이름 없음'}</span>
+            <span class="invItemMeta">
+              획득: ${new Date(e.at).toLocaleDateString()}${e.price ? ' · ' + e.price + ' G' : ''}
+            </span>
+          `;
+          box.appendChild(row);
+        });
+      });
+    }
+
+    // ===== UI 렌더링 =====
+    function renderList(){
+      const box = $('#charList');
+      const no = $('#noChars');
+      box.innerHTML = '';
+
+      if(!state.members.length){
+        no.style.display = 'block';
+        $('#saveBtn').disabled = true;
+        return;
+      }
+      no.style.display = 'none';
+      $('#saveBtn').disabled = false;
+
+      state.members.forEach(ch=>{
+        const item = document.createElement('div');
+        item.className = 'charItem' + (ch.id === state.currentId ? ' active' : '');
+        const img = document.createElement('img');
+        img.src = ch.img || 'https://via.placeholder.com/80x80/1d1f26/777?text=NO';
+        img.alt = ch.name || 'portrait';
+
+        const meta = document.createElement('div');
+        meta.className = 'charMeta';
+        meta.innerHTML = `
+          <strong>${ch.name || '무명'}</strong>
+          <span>${ch.role || '-'}${ch.sub ? ' · ' + ch.sub : ''}</span>
+        `;
+
+        item.appendChild(img);
+        item.appendChild(meta);
+        item.addEventListener('click', ()=>{
+          state.currentId = ch.id;
+          renderList();
+          renderDetail();
+        });
+
+        box.appendChild(item);
+      });
+    }
+
+    function renderDetail(){
+      const ch = state.members.find(c=>c.id === state.currentId);
+      const nameEl = $('#viewName');
+      const roleEl = $('#viewRole');
+      const noteEl = $('#viewNote');
+      const imgEl  = $('#viewImg');
+
+      if(!ch){
+        nameEl.textContent = '캐릭터 없음';
+        roleEl.textContent = '역할 / 소속';
+        noteEl.textContent = '';
+        imgEl.src = 'https://via.placeholder.com/120x160/1d1f26/777?text=NO';
+        ['Glove','Pants','Shirt','Boots','Weapon'].forEach(k=>{
+          $('#eq'+k).value = '';
+        });
+        $('#equipSummary').textContent =
+          '왼쪽에서 캐릭터를 선택하면 장비 내용을 편집/요약해서 보여줍니다.';
+        return;
+      }
+
+      nameEl.textContent = ch.name || '무명';
+      roleEl.textContent = (ch.role || '-') + (ch.sub ? ' / ' + ch.sub : '');
+      noteEl.textContent = ch.note || '';
+      imgEl.src = ch.img || 'https://via.placeholder.com/120x160/1d1f26/777?text=NO';
+
+      const eq = ch.equip || {};
+      $('#eqGlove').value  = eq.glove  || '';
+      $('#eqPants').value  = eq.pants  || '';
+      $('#eqShirt').value  = eq.shirt  || '';
+      $('#eqBoots').value  = eq.boots  || '';
+      $('#eqWeapon').value = eq.weapon || '';
+
+      updateSummary();
+      renderInventory(); // ← 선택 캐릭터 변경 시 인벤토리도 갱신
+    }
+
+    function updateSummary(){
+      const ch = state.members.find(c=>c.id === state.currentId);
+      const box = $('#equipSummary');
+      if(!ch){
+        box.textContent =
+          '왼쪽에서 캐릭터를 선택하면 장비 내용을 편집/요약해서 보여줍니다.';
+        return;
+      }
+      const g = $('#eqGlove').value.trim()  || '-';
+      const p = $('#eqPants').value.trim()  || '-';
+      const s = $('#eqShirt').value.trim()  || '-';
+      const b = $('#eqBoots').value.trim()  || '-';
+      const w = $('#eqWeapon').value.trim() || '-';
+
+      box.innerHTML =
+        `<strong>${ch.name || '무명'}</strong> 의 현재 장비<br>` +
+        `• 장갑: ${g}<br>` +
+        `• 바지: ${p}<br>` +
+        `• 셔츠: ${s}<br>` +
+        `• 신발: ${b}<br>` +
+        `• 무기: ${w}`;
+    }
+
+    function bindEquipInputs(){
+      ['Glove','Pants','Shirt','Boots','Weapon'].forEach(k=>{
+        const el = $('#eq'+k);
+        if(!el) return;
+        el.addEventListener('input', updateSummary);
+      });
+    }
+
+    function saveCurrentEquip(){
+      const ch = state.members.find(c=>c.id === state.currentId);
+      if(!ch){
+        alert('먼저 왼쪽에서 캐릭터를 선택해주세요.');
+        return;
+      }
+      const equip = {
+        glove:  $('#eqGlove').value.trim(),
+        pants:  $('#eqPants').value.trim(),
+        shirt:  $('#eqShirt').value.trim(),
+        boots:  $('#eqBoots').value.trim(),
+        weapon: $('#eqWeapon').value.trim()
+      };
+      ch.equip = equip;
+      saveMembers();
+      updateSummary();
+      renderList(); // 카드에 장비/소속/직업 등이 바뀌었을 수도 있으니 갱신
+      alert('장비가 저장되었습니다.\n다른 페이지(멤버/프로필/전투)에서도 바로 반영됩니다.');
+    }
+
+    function init(){
+      state.members = loadMembers();
+      if(state.members.length){
+        state.currentId = state.members[0].id;
+      }
+      renderList();
+      renderDetail();
+      renderInventory();   // ← 첫 화면 진입 시 인벤토리 표시
+      bindEquipInputs();
+
+      $('#saveBtn').addEventListener('click', saveCurrentEquip);
+    }
+
+    init();
+  </script>
+</body>
+</html>
