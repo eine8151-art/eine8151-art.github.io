@@ -185,8 +185,19 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
   <strong style="font-family:'Cinzel',serif;letter-spacing:.06em">MEMBER 관리</strong>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <a class="btn outline" href="index.html">← main</a>
+    <!-- 전체 멤버 내보내기/불러오기 -->
     <button id="exportBtn" class="btn outline">내보내기</button>
-    <label class="btn outline" style="cursor:pointer">불러오기<input id="importInput" type="file" accept="application/json" hidden></label>
+    <label class="btn outline" style="cursor:pointer">
+      불러오기
+      <input id="importInput" type="file" accept="application/json" hidden>
+    </label>
+    <!-- ✅ 추가: 선택된 캐릭터만 내보내기/불러오기 -->
+    <button id="exportOneBtn" class="btn outline" title="현재 선택된 캐릭터만 JSON으로 내보내기">선택 내보내기</button>
+    <label class="btn outline" style="cursor:pointer" title="단일 캐릭터 JSON 불러오기(병합)">
+      선택 불러오기
+      <input id="importOneInput" type="file" accept="application/json" hidden>
+    </label>
+    <!-- 외부 JSON 파일 열기/저장 (File System Access API) -->
     <button id="openDataBtn" class="btn outline" title="외부 JSON 파일 열기">데이터 열기</button>
     <button id="saveDataBtn" class="btn outline" title="열어둔 JSON 파일에 저장">데이터 저장</button>
   </div>
@@ -318,730 +329,1037 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
   </div>
 </div>
 
-<script>
-  // ===== 공통 상수 & 상태 =====
-  const STORE      = 'members.v1';
-  const STORE_OLD  = 'memberData.v1';   // 예전 키 호환
-  const REP        = 'representativeId';
-  const CODEX      = 'codex.v1';
+  <script>
+    /* =========================================================
+    *  상수 / 레이블 / 공통 상태
+    * ======================================================= */
 
-  const TYPE_LABELS = {
-    trait: '특성',
-    tech: '기술',
-    magic: '마법',
-    skill: '스킬',
-    authority: '권능',
-    blessing: '가호',
-    proficiency: '숙련도'
-  };
+    // localStorage 키들
+    const STORE     = 'members.v1';     // 현재 사용하는 멤버 저장소
+    const STORE_OLD = 'memberData.v1';  // 예전 키(호환용)
+    const REP       = 'representativeId';
+    const CODEX     = 'codex.v1';       // 도감(compendium) 저장소
 
-  const RANK_ORDER = [
-    'EX','SSS','SS','S+','S',
-    'A++','A+','A','A-',
-    'B++','B+','B','B-',
-    'C++','C+','C','C-',
-    'D++','D+','D','D-',
-    'F++','F+','F','F-'
-  ];
-  const rankIndex = r => {
-    const i = RANK_ORDER.indexOf(r || '');
-    return i === -1 ? 999 : i;
-  };
+    // 도감 타입 → 한글 라벨
+    const TYPE_LABELS = {
+      trait:       '특성',
+      tech:        '기술',
+      magic:       '마법',
+      skill:       '스킬',
+      authority:   '권능',
+      blessing:    '가호',
+      proficiency: '숙련도'
+    };
 
-  const $id = id => document.getElementById(id);
+    // 등급 정렬 기준 (앞에 있을수록 높은 등급)
+    const RANK_ORDER = [
+      'EX','SSS','SS','S+','S',
+      'A++','A+','A','A-',
+      'B++','B+','B','B-',
+      'C++','C+','C','C-',
+      'D++','D+','D','D-',
+      'F++','F+','F','F-'
+    ];
 
-  const S = {
-    list: [],
-    currentId: null,
-    skills: [],
-    timeline: [],
-    imgData: ''   // 현재 편집 중인 캐릭터의 이미지(DataURL)
-  };
+    // 등급 문자열 → 인덱스 (작을수록 높은 등급, 없으면 999)
+    const rankIndex = r => {
+      const i = RANK_ORDER.indexOf(r || '');
+      return i === -1 ? 999 : i;
+    };
 
-  const listEl  = $id('list');
-  const imgPrev = $id('imgPrev');
-  const wrapEl   = document.querySelector('.wrap');
-  const editorEl = document.querySelector('.wrap > .card:nth-of-type(2)');
+    // id 선택 단축
+    const $id = id => document.getElementById(id);
 
-  function setViewMode(mode){
-    if (!wrapEl || !editorEl) return;
-    if (mode === 'edit'){
-      wrapEl.classList.remove('list-only');
-      editorEl.classList.remove('hidden');
-    } else { // 'list'
-      wrapEl.classList.add('list-only');
-      editorEl.classList.add('hidden');
-    }
-  }
+    // 화면/데이터 공통 상태
+    const S = {
+      list:      [],       // 전체 캐릭터 목록
+      currentId: null,     // 현재 편집 중인 캐릭터 id
+      skills:    [],       // 현재 캐릭터의 스킬/특성 리스트
+      timeline:  [],       // 현재 캐릭터의 타임라인
+      imgData:   ''        // 현재 캐릭터 이미지(DataURL)
+    };
 
-  // ===== 기본 로딩 / 저장 =====
-  function loadInitialMembers() {
-    try {
-      const cur = JSON.parse(localStorage.getItem(STORE) || '[]');
-      const old = JSON.parse(localStorage.getItem(STORE_OLD) || '[]');
-      if (Array.isArray(cur) && cur.length) {
-        S.list = cur;
-      } else if (Array.isArray(old) && old.length) {
-        S.list = old;
-        saveMembersToStorage();
+    /* =========================================================
+    *  DOM 참조 & 뷰 모드 전환
+    * ======================================================= */
+
+    const listEl   = $id('list');
+    const imgPrev  = $id('imgPrev');
+    const wrapEl   = document.querySelector('.wrap');
+    const editorEl = document.querySelector('.wrap > .card:nth-of-type(2)');
+
+    /**
+     * 보기 모드 전환
+     * - 'list' : 캐릭터 리스트만
+     * - 'edit' : 오른쪽 편집 폼까지 표시
+     */
+    function setViewMode(mode){
+      if (!wrapEl || !editorEl) return;
+      if (mode === 'edit'){
+        wrapEl.classList.remove('list-only');
+        editorEl.classList.remove('hidden');
       } else {
-        S.list = [];
+        wrapEl.classList.add('list-only');
+        editorEl.classList.add('hidden');
       }
-    } catch (e) {
-      console.error(e);
-      S.list = [];
-    }
-  }
-
-  function saveMembersToStorage() {
-    try {
-      localStorage.setItem(STORE, JSON.stringify(S.list));
-      localStorage.setItem(STORE_OLD, JSON.stringify(S.list));
-    } catch (e) {
-      console.error('members 저장 오류', e);
-      alert(
-      '캐릭터를 저장하는 중 오류가 발생했습니다.\n' +
-      '이미지 용량이 너무 크거나, 브라우저 저장소(LocalStorage) 용량이 가득 찼을 수 있어요.'
-    );
-  }
-}
-
-  function uid() {
-    return Math.random().toString(36).slice(2, 9);
-  }
-
-  // ===== 리스트 렌더링 =====
-  function drawList() {
-    listEl.innerHTML = '';
-    if (!S.list.length) {
-      listEl.innerHTML =
-        '<div class="small" style="grid-column:1/-1;">캐릭터가 없습니다. 새로 추가해 주세요.</div>';
-      return;
     }
 
-    S.list.forEach(ch => {
-      const item = document.createElement('div');
-      item.className = 'item';
-      if (ch.id === S.currentId) item.classList.add('active');
+    /* =========================================================
+    *  초기 로딩 / 저장 유틸
+    * ======================================================= */
 
-      const img = ch.img
-        ? `<img src="${ch.img}" alt="" class="thumb">`
-        : `<img src="https://via.placeholder.com/300x200/2a2a2a/888?text=NO+IMAGE" class="thumb" alt="">`;
-
-      item.innerHTML = `
-        ${img}
-        <div class="meta">
-          <strong>${ch.name || '무명'}</strong>
-          <div class="small">${ch.role || '역할 미지정'}</div>
-        </div>
-      `;
-      item.onclick = () => {
-        loadToForm(ch.id);
-        setViewMode('edit');   // 캐릭터 클릭 → 편집 화면으로
-      };
-      listEl.appendChild(item);
-    });
-
-    saveMembersToStorage();
-  }
-
-  // ===== 폼 로딩 / 리셋 =====
-  function loadToForm(id) {
-    const ch = S.list.find(v => v.id === id);
-    if (!ch) return;
-
-    setViewMode('edit'); // 어디에서 호출하든, 캐릭터를 불러오면 편집 모드
-
-    S.currentId = id;
-    S.skills    = Array.isArray(ch.skills)   ? [...ch.skills]   : [];
-    S.timeline  = Array.isArray(ch.timeline) ? [...ch.timeline] : [];
-    S.imgData   = ch.img || '';
-
-    $id('fName').value = ch.name || '';
-    $id('fRole').value = ch.role || '';
-    $id('fSub').value  = ch.sub  || '';
-    $id('fNote').value = ch.note || '';
-
-    imgPrev.src = ch.img || '';
-
-    const st = ch.stats || {};
-    $id('stStr').value  = st.str  ?? st.atk ?? 0;
-    $id('stEnd').value  = st.end  ?? st.def ?? 0;
-    $id('stAgi').value  = st.agi  ?? st.spd ?? 0;
-    $id('stInt').value  = st.int  ?? 0;
-    $id('stMana').value = st.mana ?? st.hp ?? 0;
-    $id('stLuck').value = st.luck ?? 0;
-
-    const eq = ch.equip || {};
-    $id('eqGlove').value  = eq.glove  || '';
-    $id('eqPants').value  = eq.pants  || '';
-    $id('eqShirt').value  = eq.shirt  || '';
-    $id('eqBoots').value  = eq.boots  || '';
-    $id('eqWeapon').value = eq.weapon || '';
-
-    drawSkills();
-    drawTimeline();
-    drawList();
-  }
-
-  function resetForm() {
-    S.currentId = null;
-    S.skills    = [];
-    S.timeline  = [];
-    S.imgData   = '';
-
-    $id('fName').value = '';
-    $id('fRole').value = 'DEALER';
-    $id('fSub').value  = '';
-    $id('fNote').value = '';
-
-    imgPrev.src = '';
-    const fImg = $id('fImg');
-    if (fImg) fImg.value = '';
-
-    $id('stStr').value  = 0;
-    $id('stEnd').value  = 0;
-    $id('stAgi').value  = 0;
-    $id('stInt').value  = 0;
-    $id('stMana').value = 0;
-    $id('stLuck').value = 0;
-
-    $id('eqGlove').value  = '';
-    $id('eqPants').value  = '';
-    $id('eqShirt').value  = '';
-    $id('eqBoots').value  = '';
-    $id('eqWeapon').value = '';
-
-    drawSkills();
-    drawTimeline();
-    drawList();
-  }
-
-  // ===== 저장 (이미지 포함) =====
-  function save() {
-    const id = S.currentId || uid();
-    const existing = S.list.find(c => c.id === id);
-
-    const stats = {
-      str:  +($id('stStr').value  || 0),
-      end:  +($id('stEnd').value  || 0),
-      agi:  +($id('stAgi').value  || 0),
-      int:  +($id('stInt').value  || 0),
-      mana: +($id('stMana').value || 0),
-      luck: +($id('stLuck').value || 0)
-    };
-
-    const equip = {
-      glove:  ($id('eqGlove').value  || '').trim(),
-      pants:  ($id('eqPants').value  || '').trim(),
-      shirt:  ($id('eqShirt').value  || '').trim(),
-      boots:  ($id('eqBoots').value  || '').trim(),
-      weapon: ($id('eqWeapon').value || '').trim()
-    };
-
-    // ✅ 업로드한 이미지(S.imgData)를 최우선으로 사용
-    const imgData = S.imgData || (existing && existing.img) || imgPrev.src || '';
-
-    const d = {
-      id,
-      name: ($id('fName').value || '').trim(),
-      role: ($id('fRole').value || '').trim(),
-      sub:  ($id('fSub').value  || '').trim(),
-      note: ($id('fNote').value || '').trim(),
-      img:  imgData,
-      stats,
-      equip,
-      skills:   [...S.skills],
-      timeline: [...S.timeline]
-    };
-
-    const idx = S.list.findIndex(c => c.id === id);
-    if (idx >= 0) S.list[idx] = d;
-    else S.list.push(d);
-
-    S.currentId = id;
-    saveMembersToStorage();
-    drawList();
-    alert('저장되었습니다.');
-  }
-
-  // ===== 스킬 / 타임라인 렌더링 =====
-  function drawSkills() {
-    const box = $id('skillList');
-    box.innerHTML = '';
-    if (!S.skills.length) {
-      box.innerHTML = '<div class="small">(스킬/특성 없음)</div>';
-      return;
+    // 랜덤 id 생성
+    function uid() {
+      return Math.random().toString(36).slice(2, 9);
     }
-    S.skills.forEach((name, i) => {
-      const pill = document.createElement('span');
-      pill.className = 'pill';
-      pill.textContent = name;
-      pill.onclick = () => {
-        if (confirm(`"${name}" 을(를) 제거할까요?`)) {
-          S.skills.splice(i, 1);
-          drawSkills();
-        }
-      };
-      box.appendChild(pill);
-    });
-  }
 
-  function drawTimeline() {
-    const wrap = $id('timelineWrap');
-    if (!S.timeline.length) {
-      wrap.innerHTML = '<span class="small">(비어 있음)</span>';
-      return;
-    }
-    wrap.innerHTML = S.timeline
-      .map(t => `• ${t.date || ''} – ${t.text || ''}`)
-      .join('<br>');
-  }
-
-  // ===== 파일/JSON 내보내기 & 가져오기 =====
-  function exportMembers() {
-    const blob = new Blob([JSON.stringify(S.list, null, 2)], {
-      type: 'application/json'
-    });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'members.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  function importMembersFromFile(file) {
-    const reader = new FileReader();
-    reader.onload = () => {
+    // localStorage → 멤버 목록 로딩 (새 키 우선, 없으면 옛 키)
+    function loadInitialMembers() {
       try {
-        const arr = JSON.parse(reader.result);
-        if (Array.isArray(arr)) {
-          S.list = arr;
-          S.currentId = null;
-          S.skills = [];
-          S.timeline = [];
-          S.imgData = '';
-          drawList();
-          alert('가져오기 완료');
+        const cur = JSON.parse(localStorage.getItem(STORE) || '[]');
+        const old = JSON.parse(localStorage.getItem(STORE_OLD) || '[]');
+
+        if (Array.isArray(cur) && cur.length) {
+          S.list = cur;
+        } else if (Array.isArray(old) && old.length) {
+          S.list = old;
+          saveMembersToStorage(); // 옛 키에서 새 키로 승격
         } else {
-          alert('JSON 배열 형식이 아닙니다.');
+          S.list = [];
         }
       } catch (e) {
-        alert('JSON 파싱 실패');
+        console.error(e);
+        S.list = [];
       }
-    };
-    reader.readAsText(file);
-  }
-
-  // ===== 도감(Compendium) 로딩 =====
-  function loadCodex() {
-    try {
-      const arr = JSON.parse(localStorage.getItem(CODEX) || '[]');
-      return Array.isArray(arr) ? arr : [];
-    } catch (e) {
-      console.error('codex 로드 실패', e);
-      return [];
     }
-  }
 
-  // ===== 도감 미니 팝업 (JS로만 구현) =====
-  const codexModal = $id('codexModal');
-  const cxQ        = $id('cxQ');
-  const cxRank     = $id('cxRank');
-  const cxSort     = $id('cxSort');
-  const cxTags     = $id('cxTags');
-  const cxList     = $id('cxList');
-  const cxSelInfo  = $id('cxSelInfo');
-  const cxAdd      = $id('cxAdd');
-
-  let cxData       = [];
-  let cxFilterType = 'all';
-  let cxSelected   = null;
-  let cxActiveTags = new Set();
-
-  function buildCxTags() {
-    cxTags.innerHTML = '';
-    const map = new Map();
-    cxData.forEach(x => {
-      (x.tags || '')
-        .split(/[,\s]+/)
-        .map(t => t.trim())
-        .filter(Boolean)
-        .forEach(t => map.set(t, true));
-    });
-    const tags = Array.from(map.keys());
-    if (!tags.length) {
-      cxTags.innerHTML = '<span class="small">(태그 없음)</span>';
-      return;
-    }
-    tags.forEach(tag => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'tag';
-      btn.textContent = tag;
-      if (cxActiveTags.has(tag)) btn.classList.add('active');
-      btn.onclick = () => {
-        if (cxActiveTags.has(tag)) cxActiveTags.delete(tag);
-        else cxActiveTags.add(tag);
-        renderCxList();
-      };
-      cxTags.appendChild(btn);
-    });
-  }
-
-  function filteredCx() {
-    let arr = cxData.slice();
-    if (cxFilterType !== 'all') {
-      arr = arr.filter(x => x.type === cxFilterType);
-    }
-    const term = (cxQ.value || '').toLowerCase().trim();
-    if (term) {
-      arr = arr.filter(x => {
-        const name = (x.name || '').toLowerCase();
-        const tags = (x.tags || '').toLowerCase();
-        const desc = (x.desc || '').toLowerCase();
-        return (
-          name.includes(term) ||
-          tags.includes(term) ||
-          desc.includes(term)
+    // 멤버 목록 저장 (새/옛 키 둘 다)
+    function saveMembersToStorage() {
+      try {
+        localStorage.setItem(STORE,     JSON.stringify(S.list));
+        localStorage.setItem(STORE_OLD, JSON.stringify(S.list));
+      } catch (e) {
+        console.error('members 저장 오류', e);
+        alert(
+          '캐릭터를 저장하는 중 오류가 발생했습니다.\n' +
+          '이미지 용량이 너무 크거나, 브라우저 저장소(LocalStorage) 용량이 가득 찼을 수 있어요.'
         );
-      });
-    }
-    if (cxActiveTags.size) {
-      arr = arr.filter(x => {
-        const tags = (x.tags || '')
-          .split(/[,\s]+/)
-          .map(t => t.trim())
-          .filter(Boolean);
-        return tags.some(t => cxActiveTags.has(t));
-      });
-    }
-    const rankVal = cxRank ? cxRank.value : '';
-    if (rankVal) {
-      const minIdx = rankIndex(rankVal);
-      arr = arr.filter(x => rankIndex(x.rank) <= minIdx);
-    }
-    const sortVal = cxSort ? cxSort.value : 'rank';
-    if (sortVal === 'name') {
-      arr.sort((a, b) =>
-        (a.name || '').localeCompare(b.name || '', 'ko')
-      );
-    } else {
-      arr.sort((a, b) => {
-        const d = rankIndex(a.rank) - rankIndex(b.rank);
-        if (d !== 0) return d;
-        return (a.name || '').localeCompare(b.name || '', 'ko');
-      });
-    }
-    return arr;
-  }
-
-  function renderCxList() {
-    const arr = filteredCx();
-    cxList.innerHTML = '';
-    if (!arr.length) {
-      cxList.innerHTML =
-        '<div class="small">검색 결과가 없습니다.</div>';
-      cxSelInfo.textContent = '항목을 선택하면 상세가 보입니다.';
-      cxAdd.disabled = true;
-      return;
-    }
-    arr.forEach(x => {
-      const card = document.createElement('div');
-      card.className = 'cardc';
-      if (cxSelected && cxSelected.name === x.name) {
-        card.classList.add('selected');
       }
-      card.innerHTML = `
-        <div class="thc" style="background-image:url('${x.icon || ''}')"></div>
-        <div class="meta">
-          <strong>${x.name || ''}</strong>
-          <div class="small">
-            ${(TYPE_LABELS[x.type] || x.type || '')}
-            ${x.rank ? `<span class="badge" data-rank="${x.rank}">${x.rank}</span>` : ''}
-          </div>
-        </div>
-      `;
-      card.onclick = () => {
-        cxSelected = x;
-        renderCxList();
-      };
-      cxList.appendChild(card);
-    });
-
-    if (cxSelected) {
-      cxSelInfo.innerHTML = `
-        <div class="detail">
-          <img class="prev" src="${cxSelected.icon || ''}" alt="">
-          <div>
-            <strong>${cxSelected.name || ''}</strong>
-            ${cxSelected.rank ? `<span class="badge" data-rank="${cxSelected.rank}">${cxSelected.rank}</span>` : ''}
-            <div class="small" style="margin:4px 0">
-              ${(TYPE_LABELS[cxSelected.type] || cxSelected.type || '')}
-              ${cxSelected.tags ? ' · ' + cxSelected.tags : ''}
-            </div>
-            <div>${cxSelected.desc || ''}</div>
-          </div>
-        </div>
-      `;
-      cxAdd.disabled = false;
-    } else {
-      cxSelInfo.textContent = '항목을 선택하면 상세가 보입니다.';
-      cxAdd.disabled = true;
-    }
-  }
-
-  function openPicker() {
-    if (!codexModal) {
-      alert('도감 모달 요소를 찾을 수 없습니다.');
-      return;
-    }
-    cxData = loadCodex();
-    if (!cxData.length) {
-      cxList.innerHTML =
-        '<div class="small">도감에 등록된 항목이 없습니다. compendium.html에서 항목을 먼저 추가해 주세요.</div>';
-      cxSelInfo.textContent = '';
     }
 
-    cxFilterType = 'all';
-    cxSelected   = null;
-    cxActiveTags.clear();
-    if (cxQ)     cxQ.value = '';
-    if (cxRank)  cxRank.value = '';
-    if (cxSort)  cxSort.value = 'rank';
+    /* =========================================================
+    *  스킬 배열 중복 체크 (문자열/객체 혼합 대응)
+    * ======================================================= */
 
-    buildCxTags();
-    renderCxList();
-    codexModal.classList.add('show');
-  }
+    /**
+     * 현재 S.skills 에
+     * - 동일한 codexId, 또는
+     * - 동일한 name + rank
+     * 를 가진 항목이 이미 존재하는지 확인
+     */
+    function hasSkill(name, rank, codexId) {
+      const n = (name    || '').trim();
+      const r = (rank    || '').trim();
+      const c = (codexId || '').trim();
 
-  function closePicker() {
-    if (codexModal) codexModal.classList.remove('show');
-  }
+      return S.skills.some(s => {
+        if (!s) return false;
 
-  // ===== 초기 바인딩 =====
-  function bindEvents() {
-    $id('newBtn').onclick    = () => {
-      resetForm();
-      setViewMode('edit');    // 새 캐릭터 생성도 편집 화면으로
-    };
-    $id('saveBtn').onclick   = save;
-    $id('setRepBtn').onclick = () => {
-      if (!S.currentId) {
-        alert('먼저 캐릭터를 선택하거나 저장해 주세요.');
+        // 1) codexId가 둘 다 있으면 codexId 기준으로 비교
+        const sCid = (s.codexId || '').trim();
+        if (c && sCid && sCid === c) return true;
+
+        // 2) 나머지는 name + rank 기준
+        if (typeof s === 'string') {
+          // 옛 형식: 문자열만 있을 때는 이름만 비교 (등급 정보 없음)
+          return s === n && !r;
+        }
+
+        const sn = (s.name || '').trim();
+        const sr = (s.rank || '').trim();
+        return sn === n && sr === r;
+      });
+    }
+
+    /* =========================================================
+    *  캐릭터 리스트 렌더링
+    * ======================================================= */
+
+    function drawList() {
+      listEl.innerHTML = '';
+
+      if (!S.list.length) {
+        listEl.innerHTML =
+          '<div class="small" style="grid-column:1/-1;">캐릭터가 없습니다. 새로 추가해 주세요.</div>';
         return;
       }
-      localStorage.setItem(REP, S.currentId);
-      alert('대표 캐릭터로 지정했습니다.');
-    };
 
-    // ✅ 이미지 업로드 → S.imgData + 미리보기
-    $id('fImg').onchange = e => {
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
+      S.list.forEach(ch => {
+        const item = document.createElement('div');
+        item.className = 'item';
+        if (ch.id === S.currentId) item.classList.add('active');
 
-  const img = new Image();
-  const url = URL.createObjectURL(file);
+        const img = ch.img
+          ? `<img src="${ch.img}" alt="" class="thumb">`
+          : `<img src="https://via.placeholder.com/300x200/2a2a2a/888?text=NO+IMAGE" class="thumb" alt="">`;
 
-  img.onload = () => {
-    // 최대 한 변 512px 정도로 축소 (용량 줄이기)
-    const maxSize = 512;
-    const scale = Math.min(
-      maxSize / img.width,
-      maxSize / img.height,
-      1
-    );
+        item.innerHTML = `
+          ${img}
+          <div class="meta">
+            <strong>${ch.name || '무명'}</strong>
+            <div class="small">${ch.role || '역할 미지정'}</div>
+          </div>
+        `;
 
-    const canvas = document.createElement('canvas');
-    canvas.width  = Math.round(img.width  * scale);
-    canvas.height = Math.round(img.height * scale);
+        // 카드 클릭 → 폼에 불러오고 편집 모드로 전환
+        item.onclick = () => {
+          loadToForm(ch.id);
+          setViewMode('edit');
+        };
 
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        listEl.appendChild(item);
+      });
 
-    // JPEG로 인코딩해서 용량 더 줄이기
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      // 리스트가 변경될 때마다 저장
+      saveMembersToStorage();
+    }
 
-    // 미리보기 + 실제 저장될 데이터
-    S.imgData = dataUrl;
-    imgPrev.src = dataUrl;
+    /* =========================================================
+    *  폼에 캐릭터 불러오기 / 리셋
+    * ======================================================= */
 
-    URL.revokeObjectURL(url);
-  };
+    // id로 캐릭터 찾아 폼에 채우기
+    function loadToForm(id) {
+      const ch = S.list.find(v => v.id === id);
+      if (!ch) return;
 
-  img.onerror = () => {
-    URL.revokeObjectURL(url);
-    alert('이미지를 불러오는 데 실패했습니다.');
-  };
+      setViewMode('edit'); // 어디서 호출되든 캐릭터를 불러오면 편집 모드
 
-  img.src = url;
-};
+      S.currentId = id;
+      S.skills    = Array.isArray(ch.skills)   ? [...ch.skills]   : [];
+      S.timeline  = Array.isArray(ch.timeline) ? [...ch.timeline] : [];
+      S.imgData   = ch.img || '';
 
-    // 스킬 입력 (엔터)
-    const skillInput = $id('skillInput');
-    skillInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const v = skillInput.value.trim();
-        if (v) {
-          S.skills.push(v);
-          skillInput.value = '';
-          drawSkills();
-        }
-      }
-    });
+      // 기본 정보
+      $id('fName').value = ch.name || '';
+      $id('fRole').value = ch.role || '';
+      $id('fSub').value  = ch.sub  || '';
+      $id('fNote').value = ch.note || '';
 
-    // 스킬 리스트 파일(.json/.csv/.txt)에서 불러오기
-    $id('skillFile').onchange = e => {
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      const r = new FileReader();
-      r.onload = () => {
-        const text = String(r.result || '');
-        let arr = [];
-        if (f.name.endsWith('.json')) {
-          try {
-            const j = JSON.parse(text);
-            if (Array.isArray(j)) arr = j;
-          } catch (e2) { alert('JSON 파싱 실패'); }
-        } else if (f.name.endsWith('.csv') || f.name.endsWith('.txt')) {
-          arr = text
-            .split(/[\r\n,]+/)
-            .map(v => v.trim())
-            .filter(Boolean);
-        }
-        arr.forEach(v => {
-          if (!S.skills.includes(v)) S.skills.push(v);
-        });
-        drawSkills();
-      };
-      r.readAsText(f);
-    };
+      imgPrev.src = ch.img || '';
 
-    // 타임라인 추가
-    $id('tlAdd').onclick = () => {
-      const date = $id('tlDate').value.trim();
-      const text = $id('tlText').value.trim();
-      if (!text) return;
-      S.timeline.push({ date, text });
-      $id('tlText').value = '';
+      // 스탯 (옛 키 atk/def/spd/hp 호환)
+      const st = ch.stats || {};
+      $id('stStr').value  = st.str  ?? st.atk ?? 0;
+      $id('stEnd').value  = st.end  ?? st.def ?? 0;
+      $id('stAgi').value  = st.agi  ?? st.spd ?? 0;
+      $id('stInt').value  = st.int  ?? 0;
+      $id('stMana').value = st.mana ?? st.hp  ?? 0;
+      $id('stLuck').value = st.luck ?? 0;
+
+      // 장비
+      const eq = ch.equip || {};
+      $id('eqGlove').value  = eq.glove  || '';
+      $id('eqPants').value  = eq.pants  || '';
+      $id('eqShirt').value  = eq.shirt  || '';
+      $id('eqBoots').value  = eq.boots  || '';
+      $id('eqWeapon').value = eq.weapon || '';
+
+      drawSkills();
       drawTimeline();
-    };
-
-    // JSON 내보내기 / 가져오기
-    $id('exportBtn').onclick = exportMembers;
-    $id('importInput').onchange = e => {
-      const f = e.target.files && e.target.files[0];
-      if (f) importMembersFromFile(f);
-    };
-
-    // ✅ 도감에서 추가 (버튼 → 모달 OPEN)
-    const pickBtn = $id('pickFromCodex');
-    if (pickBtn) pickBtn.onclick = openPicker;
-
-    const closeBtn = $id('closePicker');
-    if (closeBtn) closeBtn.onclick = closePicker;
-
-    if (codexModal) {
-      codexModal.addEventListener('click', e => {
-        if (e.target === codexModal) closePicker();
-      });
+      drawList();
     }
 
-    // 도감 필터 버튼(특성/기술/마법/…)
-    ['all','trait','tech','magic','skill','authority','blessing','proficiency']
-      .forEach(type => {
-        const btn = document.querySelector(
-          `#codexModal .sleft [data-type="${type}"]`
-        );
-        if (btn) {
-          btn.onclick = () => {
-            cxFilterType = type;
-            renderCxList();
-          };
-        }
-      });
+    // 폼을 비워서 새 캐릭터 입력 준비
+    function resetForm() {
+      S.currentId = null;
+      S.skills    = [];
+      S.timeline  = [];
+      S.imgData   = '';
 
-    // 검색/정렬 입력
-    [cxQ, cxRank, cxSort].forEach(el => {
-      if (el) el.addEventListener('input', renderCxList);
-    });
+      $id('fName').value = '';
+      $id('fRole').value = 'DEALER';  // 기본 직업값
+      $id('fSub').value  = '';
+      $id('fNote').value = '';
 
-    // ✅ 도감 선택 추가 → 스킬 리스트에 반영
-    if (cxAdd) {
-      cxAdd.onclick = () => {
-        if (!cxSelected) return;
-        if (!S.skills.includes(cxSelected.name)) {
-          S.skills.push(cxSelected.name);
-          drawSkills();
-        }
-        closePicker();
+      imgPrev.src = '';
+      const fImg = $id('fImg');
+      if (fImg) fImg.value = '';
+
+      $id('stStr').value  = 0;
+      $id('stEnd').value  = 0;
+      $id('stAgi').value  = 0;
+      $id('stInt').value  = 0;
+      $id('stMana').value = 0;
+      $id('stLuck').value = 0;
+
+      $id('eqGlove').value  = '';
+      $id('eqPants').value  = '';
+      $id('eqShirt').value  = '';
+      $id('eqBoots').value  = '';
+      $id('eqWeapon').value = '';
+
+      drawSkills();
+      drawTimeline();
+      drawList();
+    }
+
+    /* =========================================================
+    *  캐릭터 저장 (이미지 포함)
+    * ======================================================= */
+
+    function save() {
+      const id       = S.currentId || uid();
+      const existing = S.list.find(c => c.id === id);
+
+      // 스탯
+      const stats = {
+        str:  +($id('stStr').value  || 0),
+        end:  +($id('stEnd').value  || 0),
+        agi:  +($id('stAgi').value  || 0),
+        int:  +($id('stInt').value  || 0),
+        mana: +($id('stMana').value || 0),
+        luck: +($id('stLuck').value || 0)
       };
+
+      // 장비
+      const equip = {
+        glove:  ($id('eqGlove').value  || '').trim(),
+        pants:  ($id('eqPants').value  || '').trim(),
+        shirt:  ($id('eqShirt').value  || '').trim(),
+        boots:  ($id('eqBoots').value  || '').trim(),
+        weapon: ($id('eqWeapon').value || '').trim()
+      };
+
+      // 업로드한 이미지(S.imgData)를 우선 사용, 없으면 기존/미리보기
+      const imgData = S.imgData || (existing && existing.img) || imgPrev.src || '';
+
+      const d = {
+        id,
+        name: ($id('fName').value || '').trim(),
+        role: ($id('fRole').value || '').trim(),
+        sub:  ($id('fSub').value  || '').trim(),
+        note: ($id('fNote').value || '').trim(),
+        img:  imgData,
+        stats,
+        equip,
+        skills:   [...S.skills],
+        timeline: [...S.timeline]
+      };
+
+      const idx = S.list.findIndex(c => c.id === id);
+      if (idx >= 0) S.list[idx] = d;
+      else          S.list.push(d);
+
+      S.currentId = id;
+      saveMembersToStorage();
+      drawList();
+      alert('저장되었습니다.');
     }
 
-    // (선택 사항) 외부 JSON 파일 연동
-    const openBtn = document.getElementById('openDataBtn');
-    const saveBtn = document.getElementById('saveDataBtn');
-    if (openBtn || saveBtn) {
-      let dataFileHandle = null;
+    /* =========================================================
+    *  스킬 / 타임라인 렌더링
+    * ======================================================= */
 
-      async function openDataFile() {
+    // 스킬/특성 pill 리스트 그리기
+    function drawSkills() {
+      const box = $id('skillList');
+      box.innerHTML = '';
+
+      if (!S.skills.length) {
+        box.innerHTML = '<div class="small">(스킬/특성 없음)</div>';
+        return;
+      }
+
+      S.skills.forEach((s, i) => {
+        const pill = document.createElement('span');
+        pill.className = 'pill';
+
+        let label = '';
+        if (typeof s === 'string') {
+          // 옛 데이터: 이름만 문자열
+          label = s;
+        } else if (s && typeof s === 'object') {
+          label = s.name || '';
+          if (s.rank) {
+            label += ` [${s.rank}]`;
+          }
+          if (s.type && TYPE_LABELS[s.type]) {
+            label += ` · ${TYPE_LABELS[s.type]}`;
+          }
+        } else {
+          label = String(s);
+        }
+
+        pill.textContent = label;
+
+        // pill 클릭 → 제거 확인 후 삭제
+        pill.onclick = () => {
+          if (confirm(`"${label}" 을(를) 제거할까요?`)) {
+            S.skills.splice(i, 1);
+            drawSkills();
+          }
+        };
+
+        box.appendChild(pill);
+      });
+    }
+
+    // 시간순 텍스트만 보여주는 타임라인
+    function drawTimeline() {
+      const wrap = $id('timelineWrap');
+      if (!S.timeline.length) {
+        wrap.innerHTML = '<span class="small">(비어 있음)</span>';
+        return;
+      }
+      wrap.innerHTML = S.timeline
+        .map(t => `• ${t.date || ''} – ${t.text || ''}`)
+        .join('<br>');
+    }
+
+    /* =========================================================
+    *  멤버 JSON 파일 내보내기 / 가져오기
+    * ======================================================= */
+
+    // JSON 다운로드 (members.json)
+    function exportMembers() {
+      const blob = new Blob([JSON.stringify(S.list, null, 2)], {
+        type: 'application/json'
+      });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'members.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    // JSON 파일에서 멤버 배열 가져오기
+    function importMembersFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
         try {
-          const [handle] = await window.showOpenFilePicker({
-            types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-          });
-          dataFileHandle = handle;
-          const file = await dataFileHandle.getFile();
-          const text = await file.text();
-          const arr = JSON.parse(text);
+          const arr = JSON.parse(reader.result);
           if (Array.isArray(arr)) {
-            S.list = arr;
+            S.list      = arr;
             S.currentId = null;
-            S.skills = [];
-            S.timeline = [];
-            S.imgData = '';
+            S.skills    = [];
+            S.timeline  = [];
+            S.imgData   = '';
             drawList();
-            alert('외부 JSON에서 불러왔습니다. 저장 시 같은 파일에 덮어씁니다.');
+            alert('가져오기 완료');
           } else {
             alert('JSON 배열 형식이 아닙니다.');
           }
-        } catch (err) {
-          // 취소 가능
+        } catch (e) {
+          alert('JSON 파싱 실패');
         }
+      };
+      reader.readAsText(file);
+    }
+
+    // ✅ 단일 멤버만 JSON으로 다운로드
+    function exportCurrentMember() {
+      if (!S.currentId) {
+        alert('먼저 편집 중이거나 선택된 캐릭터가 있어야 합니다.');
+        return;
       }
 
-      async function saveToDataFile() {
+      const ch = S.list.find(c => c.id === S.currentId);
+      if (!ch) {
+        alert('선택된 캐릭터를 찾을 수 없습니다.');
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(ch, null, 2)], {
+        type: 'application/json'
+      });
+
+      const a = document.createElement('a');
+      const safeName = (ch.name || 'member').replace(/[\\\/:*?"<>|]+/g, '_');
+      a.href = URL.createObjectURL(blob);
+      a.download = `member_${safeName}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    // ✅ 단일 멤버 JSON을 읽어와 리스트에 병합
+    function importSingleMemberFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
         try {
-          if (!dataFileHandle) {
-            alert('먼저 JSON 파일을 열어 주세요.');
+          const parsed = JSON.parse(reader.result);
+          let m = null;
+
+          // 혹시 배열로 들어와도 첫 번째 원소를 멤버로 사용
+          if (Array.isArray(parsed)) {
+            if (!parsed.length) {
+              alert('JSON 배열이 비어 있습니다.');
+              return;
+            }
+            m = parsed[0];
+          } else if (parsed && typeof parsed === 'object') {
+            m = parsed;
+          } else {
+            alert('단일 캐릭터 객체(JSON) 형태가 아닙니다.');
             return;
           }
-          const writable = await dataFileHandle.createWritable();
-          await writable.write(
-            new Blob([JSON.stringify(S.list, null, 2)], {
-              type: 'application/json'
-            })
-          );
-          await writable.close();
-          alert('외부 JSON 파일에 저장했습니다.');
-        } catch (err) {
-          console.error(err);
+
+          // id 없으면 새로 부여
+          if (!m.id) m.id = uid();
+
+          const idx = S.list.findIndex(c => c.id === m.id);
+
+          // 동일 id 존재 시 덮어쓸지 물어보고 교체
+          if (idx >= 0) {
+            if (!confirm('같은 ID를 가진 캐릭터가 있어 해당 캐릭터를 덮어쓸까요?')) {
+              return;
+            }
+            S.list[idx] = m;
+          } else {
+            // 새 캐릭터로 추가
+            S.list.push(m);
+          }
+
+          // 저장 + 화면 반영
+          saveMembersToStorage();
+          S.currentId = m.id;
+          S.skills    = Array.isArray(m.skills)   ? [...m.skills]   : [];
+          S.timeline  = Array.isArray(m.timeline) ? [...m.timeline] : [];
+          S.imgData   = m.img || '';
+
+          drawList();
+          loadToForm(m.id);
+          alert('캐릭터를 불러왔습니다.');
+        } catch (e) {
+          console.error(e);
+          alert('JSON 파싱에 실패했습니다.');
         }
+      };
+      reader.readAsText(file);
+    }
+
+    /* =========================================================
+    *  도감(codex) 데이터 로딩
+    * ======================================================= */
+
+    function loadCodex() {
+      try {
+        const arr = JSON.parse(localStorage.getItem(CODEX) || '[]');
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) {
+        console.error('codex 로드 실패', e);
+        return [];
+      }
+    }
+
+    /* =========================================================
+    *  도감 미니 피커(모달) 관련 상태 / DOM
+    * ======================================================= */
+
+    const codexModal = $id('codexModal');
+    const cxQ        = $id('cxQ');
+    const cxRank     = $id('cxRank');
+    const cxSort     = $id('cxSort');
+    const cxTags     = $id('cxTags');
+    const cxList     = $id('cxList');
+    const cxSelInfo  = $id('cxSelInfo');
+    const cxAdd      = $id('cxAdd');
+
+    let cxData       = [];         // 도감 전체 배열
+    let cxFilterType = 'all';      // 좌측 타입 필터
+    let cxSelected   = null;       // 현재 선택된 도감 항목
+    let cxActiveTags = new Set();  // 태그 필터
+
+    /* ---------------------------------------------------------
+    *  도감 태그 칩 생성
+    * ------------------------------------------------------ */
+
+    function buildCxTags() {
+      cxTags.innerHTML = '';
+      const map = new Map();
+
+      // 태그 종류 수집
+      cxData.forEach(x => {
+        (x.tags || '')
+          .split(/[,\s]+/)
+          .map(t => t.trim())
+          .filter(Boolean)
+          .forEach(t => map.set(t, true));
+      });
+
+      const tags = Array.from(map.keys());
+      if (!tags.length) {
+        cxTags.innerHTML = '<span class="small">(태그 없음)</span>';
+        return;
       }
 
-      if (openBtn) openBtn.onclick = openDataFile;
-      if (saveBtn) saveBtn.onclick = saveToDataFile;
-    }
-  }
+      tags.forEach(tag => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tag';
+        btn.textContent = tag;
 
-  // ===== 초기 실행 =====
-  (function init() {
-    loadInitialMembers();
-    bindEvents();
-    drawList();
-    setViewMode('list');  // 처음엔 등록된 캐릭터들만 보여주기
-  })();
-</script>
+        if (cxActiveTags.has(tag)) btn.classList.add('active');
+
+        btn.onclick = () => {
+          if (cxActiveTags.has(tag)) cxActiveTags.delete(tag);
+          else cxActiveTags.add(tag);
+          renderCxList();
+        };
+
+        cxTags.appendChild(btn);
+      });
+    }
+
+    /* ---------------------------------------------------------
+    *  도감 리스트 필터링/정렬
+    * ------------------------------------------------------ */
+
+    function filteredCx() {
+      let arr = cxData.slice();
+
+      // 타입 필터 (특성/기술/마법/…)
+      if (cxFilterType !== 'all') {
+        arr = arr.filter(x => x.type === cxFilterType);
+      }
+
+      // 검색어(이름/태그/설명)
+      const term = (cxQ.value || '').toLowerCase().trim();
+      if (term) {
+        arr = arr.filter(x => {
+          const name = (x.name || '').toLowerCase();
+          const tags = (x.tags || '').toLowerCase();
+          const desc = (x.desc || '').toLowerCase();
+          return (
+            name.includes(term) ||
+            tags.includes(term) ||
+            desc.includes(term)
+          );
+        });
+      }
+
+      // 태그 필터
+      if (cxActiveTags.size) {
+        arr = arr.filter(x => {
+          const tags = (x.tags || '')
+            .split(/[,\s]+/)
+            .map(t => t.trim())
+            .filter(Boolean);
+          return tags.some(t => cxActiveTags.has(t));
+        });
+      }
+
+      // 등급 필터 (선택된 등급 이상)
+      const rankVal = cxRank ? cxRank.value : '';
+      if (rankVal) {
+        const minIdx = rankIndex(rankVal);
+        arr = arr.filter(x => rankIndex(x.rank) <= minIdx);
+      }
+
+      // 정렬 (이름 / 등급)
+      const sortVal = cxSort ? cxSort.value : 'rank';
+      if (sortVal === 'name') {
+        arr.sort((a, b) =>
+          (a.name || '').localeCompare(b.name || '', 'ko')
+        );
+      } else {
+        arr.sort((a, b) => {
+          const d = rankIndex(a.rank) - rankIndex(b.rank);
+          if (d !== 0) return d;
+          return (a.name || '').localeCompare(b.name || '', 'ko');
+        });
+      }
+
+      return arr;
+    }
+
+    /* ---------------------------------------------------------
+    *  도감 리스트 렌더링 + 상세
+    * ------------------------------------------------------ */
+
+    function renderCxList() {
+      const arr = filteredCx();
+      cxList.innerHTML = '';
+
+      if (!arr.length) {
+        cxList.innerHTML =
+          '<div class="small">검색 결과가 없습니다.</div>';
+        cxSelInfo.textContent = '항목을 선택하면 상세가 보입니다.';
+        cxAdd.disabled = true;
+        return;
+      }
+
+      // 카드 목록
+      arr.forEach(x => {
+        const card = document.createElement('div');
+        card.className = 'cardc';
+
+        // 같은 이름이 여러 개 있어도 "같은 id인 카드"만 선택 표시
+        if (cxSelected && cxSelected.id === x.id) {
+          card.classList.add('selected');
+        }
+
+        card.innerHTML = `
+          <div class="thc" style="background-image:url('${x.icon || ''}')"></div>
+          <div class="meta">
+            <strong>${x.name || ''}</strong>
+            <div class="small">
+              ${(TYPE_LABELS[x.type] || x.type || '')}
+              ${x.rank ? `<span class="badge" data-rank="${x.rank}">${x.rank}</span>` : ''}
+            </div>
+          </div>
+        `;
+
+        card.onclick = () => {
+          cxSelected = x;
+          renderCxList(); // 다시 그려서 선택 표시/상세 갱신
+        };
+
+        cxList.appendChild(card);
+      });
+
+      // 상세/하단 정보
+      if (cxSelected) {
+        cxSelInfo.innerHTML = `
+          <div class="detail">
+            <img class="prev" src="${cxSelected.icon || ''}" alt="">
+            <div>
+              <strong>${cxSelected.name || ''}</strong>
+              ${cxSelected.rank ? `<span class="badge" data-rank="${cxSelected.rank}">${cxSelected.rank}</span>` : ''}
+              <div class="small" style="margin:4px 0">
+                ${(TYPE_LABELS[cxSelected.type] || cxSelected.type || '')}
+                ${cxSelected.tags ? ' · ' + cxSelected.tags : ''}
+              </div>
+              <div>${cxSelected.desc || ''}</div>
+            </div>
+          </div>
+        `;
+        cxAdd.disabled = false;
+      } else {
+        cxSelInfo.textContent = '항목을 선택하면 상세가 보입니다.';
+        cxAdd.disabled = true;
+      }
+    }
+
+    /* ---------------------------------------------------------
+    *  도감 피커 열기/닫기
+    * ------------------------------------------------------ */
+
+    function openPicker() {
+      if (!codexModal) {
+        alert('도감 모달 요소를 찾을 수 없습니다.');
+        return;
+      }
+
+      cxData = loadCodex();
+      if (!cxData.length) {
+        cxList.innerHTML =
+          '<div class="small">도감에 등록된 항목이 없습니다. compendium.html에서 항목을 먼저 추가해 주세요.</div>';
+        cxSelInfo.textContent = '';
+      }
+
+      cxFilterType = 'all';
+      cxSelected   = null;
+      cxActiveTags.clear();
+
+      if (cxQ)    cxQ.value    = '';
+      if (cxRank) cxRank.value = '';
+      if (cxSort) cxSort.value = 'rank';
+
+      buildCxTags();
+      renderCxList();
+      codexModal.classList.add('show');
+    }
+
+    function closePicker() {
+      if (codexModal) codexModal.classList.remove('show');
+    }
+
+    /* =========================================================
+    *  이벤트 바인딩
+    * ======================================================= */
+
+    function bindEvents() {
+      // 새 캐릭터
+      $id('newBtn').onclick = () => {
+        resetForm();
+        setViewMode('edit');
+      };
+
+      // 저장 버튼
+      $id('saveBtn').onclick = save;
+
+      // 대표 캐릭터 지정
+      $id('setRepBtn').onclick = () => {
+        if (!S.currentId) {
+          alert('먼저 캐릭터를 선택하거나 저장해 주세요.');
+          return;
+        }
+        localStorage.setItem(REP, S.currentId);
+        alert('대표 캐릭터로 지정했습니다.');
+      };
+
+      /* --- 이미지 업로드 (용량 축소 후 DataURL 저장) --- */
+
+      $id('fImg').onchange = e => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+          // 최대 한 변 512px 정도로 축소 (용량 줄이기)
+          const maxSize = 512;
+          const scale = Math.min(
+            maxSize / img.width,
+            maxSize / img.height,
+            1
+          );
+
+          const canvas = document.createElement('canvas');
+          canvas.width  = Math.round(img.width  * scale);
+          canvas.height = Math.round(img.height * scale);
+
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          // JPEG로 인코딩해서 용량 더 줄이기
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+          // 미리보기 + 실제 저장될 데이터
+          S.imgData  = dataUrl;
+          imgPrev.src = dataUrl;
+
+          URL.revokeObjectURL(url);
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          alert('이미지를 불러오는 데 실패했습니다.');
+        };
+
+        img.src = url;
+      };
+
+      /* --- 스킬 입력(엔터) / 파일에서 스킬 불러오기 --- */
+
+      const skillInput = $id('skillInput');
+
+      // 텍스트 입력 후 엔터 → skills 배열에 문자열 추가
+      skillInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const v = skillInput.value.trim();
+          if (v) {
+            S.skills.push(v);
+            skillInput.value = '';
+            drawSkills();
+          }
+        }
+      });
+
+      // .json / .csv / .txt 파일에서 스킬 목록 가져오기
+      $id('skillFile').onchange = e => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+
+        const r = new FileReader();
+        r.onload = () => {
+          const text = String(r.result || '');
+          let arr = [];
+
+          if (f.name.endsWith('.json')) {
+            try {
+              const j = JSON.parse(text);
+              if (Array.isArray(j)) arr = j;
+            } catch (e2) {
+              alert('JSON 파싱 실패');
+            }
+          } else if (f.name.endsWith('.csv') || f.name.endsWith('.txt')) {
+            arr = text
+              .split(/[\r\n,]+/)
+              .map(v => v.trim())
+              .filter(Boolean);
+          }
+
+          arr.forEach(v => {
+            if (!S.skills.includes(v)) S.skills.push(v);
+          });
+          drawSkills();
+        };
+        r.readAsText(f);
+      };
+
+      /* --- 타임라인 추가 --- */
+
+      $id('tlAdd').onclick = () => {
+        const date = $id('tlDate').value.trim();
+        const text = $id('tlText').value.trim();
+        if (!text) return;
+        S.timeline.push({ date, text });
+        $id('tlText').value = '';
+        drawTimeline();
+      };
+
+      /* --- 멤버 JSON 내보내기 / 가져오기 --- */
+      $id('exportBtn').onclick = exportMembers;
+      $id('importInput').onchange = e => {
+        const f = e.target.files && e.target.files[0];
+        if (f) importMembersFromFile(f);
+        e.target.value = '';   // 같은 파일 다시 선택할 수 있도록 초기화
+      };
+
+      // ✅ 추가: 단일 캐릭터 내보내기/불러오기 버튼 연결
+      const exportOneBtn   = $id('exportOneBtn');
+      const importOneInput = $id('importOneInput');
+
+      if (exportOneBtn) {
+        exportOneBtn.onclick = exportCurrentMember;
+      }
+
+      if (importOneInput) {
+        importOneInput.onchange = e => {
+          const f = e.target.files && e.target.files[0];
+          if (f) importSingleMemberFromFile(f);
+          e.target.value = ''; // 파일 선택 초기화
+        };
+      }
+
+
+      /* --- 도감 피커 열기/닫기 & 필터 --- */
+
+      const pickBtn  = $id('pickFromCodex');
+      const closeBtn = $id('closePicker');
+
+      if (pickBtn)  pickBtn.onclick  = openPicker;
+      if (closeBtn) closeBtn.onclick = closePicker;
+
+      // 모달 바깥쪽 클릭 → 닫기
+      if (codexModal) {
+        codexModal.addEventListener('click', e => {
+          if (e.target === codexModal) closePicker();
+        });
+      }
+
+      // 도감 타입 필터 버튼(전체/특성/기술/…)
+      ['all','trait','tech','magic','skill','authority','blessing','proficiency']
+        .forEach(type => {
+          const btn = document.querySelector(
+            `#codexModal .sleft [data-type="${type}"]`
+          );
+          if (btn) {
+            btn.onclick = () => {
+              cxFilterType = type;
+              renderCxList();
+            };
+          }
+        });
+
+      // 검색어/등급/정렬 변경 → 리스트 재렌더링
+      [cxQ, cxRank, cxSort].forEach(el => {
+        if (el) el.addEventListener('input', renderCxList);
+      });
+
+      /* --- 도감에서 선택한 항목을 스킬 배열에 추가 --- */
+
+      if (cxAdd) {
+        cxAdd.onclick = () => {
+          if (!cxSelected) return;
+
+          const name    = cxSelected.name || '';
+          const rank    = cxSelected.rank || '';
+          const type    = cxSelected.type || '';
+          const codexId = cxSelected.id   || '';  // 도감 항목의 고유 id
+
+          // 이미 같은 codexId(또는 name+rank) 스킬이 있다면 추가하지 않음
+          if (!hasSkill(name, rank, codexId)) {
+            S.skills.push({
+              name,
+              rank,
+              type,
+              codexId      // 도감 id를 같이 저장
+            });
+            drawSkills();
+          }
+        };
+      }
+
+      /* --- (선택) 외부 JSON 파일 열기/저장 (File System Access API) --- */
+
+      const openBtn = document.getElementById('openDataBtn');
+      const saveBtn = document.getElementById('saveDataBtn');
+
+      if (openBtn || saveBtn) {
+        let dataFileHandle = null;
+
+        // OS 파일 선택 → JSON 배열 로딩
+        async function openDataFile() {
+          try {
+            const [handle] = await window.showOpenFilePicker({
+              types: [{
+                description: 'JSON',
+                accept: { 'application/json': ['.json'] }
+              }]
+            });
+
+            dataFileHandle = handle;
+            const file = await dataFileHandle.getFile();
+            const text = await file.text();
+            const arr  = JSON.parse(text);
+
+            if (Array.isArray(arr)) {
+              S.list      = arr;
+              S.currentId = null;
+              S.skills    = [];
+              S.timeline  = [];
+              S.imgData   = '';
+              drawList();
+              alert('외부 JSON에서 불러왔습니다. 저장 시 같은 파일에 덮어씁니다.');
+            } else {
+              alert('JSON 배열 형식이 아닙니다.');
+            }
+          } catch (err) {
+            // 사용자가 취소한 경우 등은 무시
+          }
+        }
+
+        // 현재 S.list → 같은 JSON 파일에 덮어쓰기
+        async function saveToDataFile() {
+          try {
+            if (!dataFileHandle) {
+              alert('먼저 JSON 파일을 열어 주세요.');
+              return;
+            }
+            const writable = await dataFileHandle.createWritable();
+            await writable.write(
+              new Blob([JSON.stringify(S.list, null, 2)], {
+                type: 'application/json'
+              })
+            );
+            await writable.close();
+            alert('외부 JSON 파일에 저장했습니다.');
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        if (openBtn) openBtn.onclick = openDataFile;
+        if (saveBtn) saveBtn.onclick = saveToDataFile;
+      }
+    }
+
+    /* =========================================================
+    *  초기 실행
+    * ======================================================= */
+
+    (function init() {
+      loadInitialMembers(); // localStorage에서 멤버 목록 로딩
+      bindEvents();         // 버튼/입력 이벤트 연결
+      drawList();           // 리스트 최초 렌더
+      setViewMode('list');  // 처음에는 리스트 우선 모드
+    })();
+  </script>
 </body>
 </html>
