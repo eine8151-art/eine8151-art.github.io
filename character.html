@@ -317,12 +317,48 @@
     </aside>
   </div>
 
-  <script>
-    const STORE='members.v1', REP='representativeId', CODEX='codex.v1', CMODE='chartMode.v1';
-    const TYPE_LABELS={trait:'특성', tech:'기술', magic:'마법', skill:'스킬', authority:'권능', blessing:'가호', proficiency:'숙련도'};
-    const RANK_ORDER=["EX","SSS","SS","S+","S","A++","A+","A","A-","B++","B+","B","B-","C++","C+","C","C-","D++","D+","D","D-","F++","F+","F","F-"];
-    const rankIndex=r=>{const i=RANK_ORDER.indexOf(r||''); return i<0?999:i};
-    // 능력치 등급 스케일 (최종치 기준)
+  <script> 
+    /* =========================================================
+     *  상수 / 공통 설정
+     * ======================================================= */
+
+    // localStorage 키
+    const STORE='members.v1';            // 멤버 리스트
+    const REP='representativeId';        // 대표 캐릭터 id
+    const CODEX='codex.v1';              // 도감 데이터 (특성/숙련도/권능/스킬 등)
+    const CMODE='chartMode.v1';          // 스탯 차트 모드 저장용
+
+    // 도감 type → 한글 라벨
+    const TYPE_LABELS={
+      trait:'특성',
+      tech:'기술',
+      magic:'마법',
+      skill:'스킬',
+      authority:'권능',
+      blessing:'가호',
+      proficiency:'숙련도'
+    };
+
+    // 항상 스탯에 상시로 적용되는 타입 (전투 여부와 무관)
+    const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']);
+
+    // 등급 정렬 기준 (앞에 있을수록 높은 등급)
+    const RANK_ORDER=[
+      "EX","SSS","SS","S+","S",
+      "A++","A+","A","A-",
+      "B++","B+","B","B-",
+      "C++","C+","C-",
+      "D++","D+","D","D-",
+      "F++","F+","F","F-"
+    ];
+
+    // 등급 → 인덱스 (숫자가 작을수록 높은 등급, 못 찾으면 999)
+    const rankIndex=r=>{
+      const i=RANK_ORDER.indexOf(r||'');
+      return i<0?999:i;
+    };
+
+    // 최종 스탯값 기준 등급 스케일
     const GRADE_SCALE=[
       {min:5000, rank:'EX'},
       {min:2000, rank:'SSS'},
@@ -341,35 +377,103 @@
       {min:20,   rank:'D'},
       {min:0,    rank:'F'}
     ];
-    const gradeFor = v => { for(const g of GRADE_SCALE){ if((v||0) >= g.min) return g.rank } return 'F' };
 
+    // 숫자 → 등급 문자열
+    const gradeFor = v => {
+      for(const g of GRADE_SCALE){
+        if((v||0) >= g.min) return g.rank
+      }
+      return 'F'
+    };
+
+    // querySelector 단축 함수
     const $=s=>document.querySelector(s);
 
-    function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name) }
-    function loadMembers(){ try{ return JSON.parse(localStorage.getItem(STORE)||'[]') }catch{ return [] } }
-    function loadCodex(){ try{ return JSON.parse(localStorage.getItem(CODEX)||'[]') }catch{ return [] } }
+    /* =========================================================
+     *  공통 유틸 함수
+     * ======================================================= */
 
+    // URL에서 쿼리 파라미터 가져오기 (?id=xxxx)
+    function getParam(name){
+      const u=new URL(location.href);
+      return u.searchParams.get(name)
+    }
+
+    // localStorage 에서 멤버 목록 불러오기
+    function loadMembers(){
+      try{
+        return JSON.parse(localStorage.getItem(STORE)||'[]')
+      }catch{
+        return []
+      }
+    }
+
+    // localStorage 에서 도감 데이터 불러오기
+    function loadCodex(){
+      try{
+        return JSON.parse(localStorage.getItem(CODEX)||'[]')
+      }catch{
+        return []
+      }
+    }
+
+    // 현재 화면에 표시할 캐릭터 선택
+    // 1순위: URL의 id, 2순위: 대표 캐릭터, 3순위: 리스트의 첫 번째
     function pickCharacter(list){
       const byId = getParam('id');
       if(byId){
         return list.find(x=>x.id===byId) || list[0]
       }
       const rep = localStorage.getItem(REP);
-      if(rep){ return list.find(x=>x.id===rep) || list[0] }
+      if(rep){
+        return list.find(x=>x.id===rep) || list[0]
+      }
       return list[0];
     }
 
-    function statRow(label, base, delta, maxRef, tooltip){
-      const row=document.createElement('div'); row.className='statrow';
-      const final = (base||0) + (delta||0);
-      const grade = gradeFor(final);
-      const maxVal = Math.max(1, maxRef||final, base, final, (base||0)+Math.abs(delta||0));
-      const signed = delta? (delta>0?`+${delta}`:`${delta}`) : '';
-      row.innerHTML = `<span>${label} [${grade}]</span>
-        <div class='bar'><span style='width:${Math.min(100, (final/maxVal)*100)}%'></span></div>
-        <div class='delta'>${final}${signed?` <span style='color:${delta>0?'#7ce085':'#f48fb1'}'>(${signed})</span>`:''}</div>`;
+    /* =========================================================
+     *  스탯 행(막대형) DOM 생성
+     * ======================================================= */
 
-      // 스탯 이름 위에 툴팁 달기
+    /**
+     * 한 줄짜리 스탯(막대 bar) DOM 생성
+     * @param {string} label - 스탯 이름 (근력 / 내구 등)
+     * @param {number} base  - 기본치
+     * @param {number} delta - 변화량(특성/숙련도/권능 보정 합)
+     * @param {number} maxRef - 막대 길이 계산용 기준값
+     * @param {string} tooltip - 마우스 오버 시 툴팁 내용
+     */
+    function statRow(label, base, delta, maxRef, tooltip){
+      const row=document.createElement('div');
+      row.className='statrow';
+
+      const final = (base||0) + (delta||0);        // 최종치
+      const grade = gradeFor(final);               // 최종치 등급
+      const maxVal = Math.max(                    // 막대 최대 기준값
+        1,
+        maxRef||final,
+        base,
+        final,
+        (base||0)+Math.abs(delta||0)
+      );
+      const signed = delta
+        ? (delta>0?`+${delta}`:`${delta}`)
+        : '';
+
+      row.innerHTML = `
+        <span>${label} [${grade}]</span>
+        <div class='bar'>
+          <span style='width:${Math.min(100,(final/maxVal)*100)}%'></span>
+        </div>
+        <div class='delta'>
+          ${final}
+          ${signed
+            ? ` <span style='color:${delta>0?'#7ce085':'#f48fb1'}'>(${signed})</span>`
+            : ''}
+        </div>
+      `;
+
+      // 스탯 이름 위에 툴팁 달기 (특성/숙련도/권능 기여 내역)
       if (tooltip){
         const nameSpan = row.querySelector('span');
         if (nameSpan) nameSpan.title = tooltip;
@@ -377,100 +481,179 @@
       return row;
     }
 
-// 특성/숙련도/권능만 항상 스탯에 반영
-const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']);
+    /* =========================================================
+     *  도감 기반 스킬/특성 스탯 보정 수집
+     *  - member에서 선택한 스킬/특성들을 도감과 매칭
+     *  - 상시 적용 타입(ALWAYS_ON_TYPES)만 스탯에 반영
+     * ======================================================= */
 
-// 이름이 같은 항목이 여러 개 있을 때
-// → 같은 이름에서는 "가장 높은 등급(랭크)" 하나만 적용
-// + 각 스탯에 어떤 출처가 기여했는지까지 기록
-function collectSkillMods(ch){
-  const names = ch.skills || [];
-  const codex = loadCodex();
-  const wanted = new Set((names || []).map(s => (s || '').toLowerCase()));
+    /**
+     * member 에서 선택된 스킬/특성들을 분석해
+     * 각 스탯별 보정값(flat, %)과 출처 목록을 반환
+     *
+     * 반환 형태:
+     * {
+     *   flat: {str,end,agi,int,mana,luck},
+     *   pct:  {str,end,agi,int,mana,luck},
+     *   sources: [
+     *     {
+     *       name, type, rank, tags,
+     *       contrib: {
+     *         str:{flat,pct}, ... (해당 스탯에 기여하는 값만)
+     *       }
+     *     }, ...
+     *   ]
+     * }
+     */
+    function collectSkillMods(ch){
+      const codex = loadCodex();
 
-  const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
-  const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+      // ch.skills 항목 정규화
+      // - 문자열: "이름"만 있는 옛 형식
+      // - 객체: { name, rank, type, codexId } 새 형식
+      const entries = (ch.skills || [])
+        .map(s => {
+          if (!s) return null;
 
-  // 출처별 기여도 기록용
-  const sources = []; // {name,type,rank,tags,contrib:{str:{flat,pct}, ...}}
+          // 옛 데이터: 단순 문자열
+          if (typeof s === 'string') {
+            return { name: s, rank: null, type: null, codexId: null };
+          }
 
-  // 1) 이름별로 가장 좋은(랭크가 높은) 항목 하나만 고르기
-  const pickedByName = new Map();
+          // 새 데이터: 객체 형태
+          if (typeof s === 'object') {
+            return {
+              name:    s.name    || '',
+              rank:    s.rank    || null,
+              type:    s.type    || null,
+              codexId: s.codexId || null
+            };
+          }
+          return null;
+        })
+        .filter(e => e && e.name);
 
-  codex.forEach(e => {
-    if (!ALWAYS_ON_TYPES.has(e.type)) return;            // 특성/숙련도/권능만
-    const key = (e.name || '').toLowerCase();
-    if (!wanted.has(key)) return;                        // 캐릭터가 가진 이름이 아니면 스킵
+      // 누적용 스탯
+      const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};  // 고정값
+      const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};  // % 보정
+      const sources = []; // 각 특성이 어느 스탯에 어떻게 기여했는지 기록
 
-    const prev = pickedByName.get(key);
-    if (!prev) {
-      pickedByName.set(key, e);
-    } else {
-      // rankIndex가 작을수록 상위 등급
-      const rNew = rankIndex(e.rank || '');
-      const rOld = rankIndex(prev.rank || '');
-      if (rNew < rOld) {
-        pickedByName.set(key, e);
-      }
-    }
-  });
+      entries.forEach(entry => {
+        const nameLower   = entry.name.toLowerCase();
+        const desiredRank = entry.rank    || null;   // member에서 선택한 등급
+        const codexId     = entry.codexId || null;   // 고유 id
 
-  // 2) 선택된 항목들만 모아서 스탯 보정 합산 + 출처 기록
-  pickedByName.forEach(e => {
-    const m = e.mod  || {};
-    const p = e.modP || {};
+        let picked = null;
 
-    const c = {}; // 이 출처가 기여한 스탯들
+        // 1) codexId가 있으면: 그 id와 일치하는 특성/숙련도/권능 항목 하나만 사용
+        if (codexId) {
+          picked = codex.find(e =>
+            ALWAYS_ON_TYPES.has(e.type) &&
+            e.id === codexId
+          ) || null;
+        }
 
-    function add(key, flatVal, pctVal){
-      const f = +(flatVal || 0);
-      const pc = +(pctVal || 0);
-      if (!f && !pc) return;
-      c[key] = {flat:f, pct:pc};
-      flat[key] += f;
-      pct[key]  += pc;
-    }
+        // 2) codexId로 못 찾았거나 codexId가 없으면: 이름 기반으로 탐색
+        if (!picked) {
+          const candidates = codex.filter(e =>
+            ALWAYS_ON_TYPES.has(e.type) &&
+            (e.name || '').toLowerCase() === nameLower
+          );
+          if (!candidates.length) return;
 
-    add('str',  m.str  ?? m.atk,  p.str  ?? p.atk);
-    add('end',  m.end  ?? m.def,  p.end  ?? p.def);
-    add('agi',  m.agi  ?? m.spd,  p.agi  ?? p.spd);
-    add('int',  m.int,           p.int);
-    add('mana', m.mana ?? m.hp,  p.mana ?? p.hp);
-    add('luck', m.luck,          p.luck);
+          if (desiredRank) {
+            // member에서 저장한 등급과 정확히 일치하는 항목 우선
+            picked = candidates.find(e => (e.rank || '') === desiredRank) || null;
 
-    if (Object.keys(c).length){
-      sources.push({
-        name: e.name || '',
-        type: e.type || '',
-        rank: e.rank || '',
-        tags: e.tags || '',
-        contrib: c
+            // 등급이 바뀌었거나 못 찾으면 → 기존처럼 "가장 높은 등급"으로 폴백
+            if (!picked) {
+              picked = candidates
+                .slice()
+                .sort((a,b) => rankIndex(a.rank) - rankIndex(b.rank))[0];
+            }
+          } else {
+            // 옛 데이터(등급 정보 없음)는 기존 동작 유지: 같은 이름 중 최고 등급
+            picked = candidates
+              .slice()
+              .sort((a,b) => rankIndex(a.rank) - rankIndex(b.rank))[0];
+          }
+        }
+
+        // 도감에서 매칭되는 항목이 없으면 건너뜀
+        if (!picked) return;
+
+        const m = picked.mod  || {};   // 고정 보정값
+        const p = picked.modP || {};   // % 보정값
+
+        // 이 특성이 기여한 스탯만 담는 객체
+        const c = {};
+
+        // 도감의 키를 캐릭터 스탯 키로 매핑해서 재계산
+        function add(key, flatVal, pctVal){
+          const f  = +(flatVal || 0);
+          const pc = +(pctVal  || 0);
+          if (!f && !pc) return;
+          c[key] = {flat:f, pct:pc}; // 출처별 기록
+          flat[key] += f;            // 전체 누적
+          pct[key]  += pc;           // 전체 누적(%)
+        }
+
+        // 도감 내부 키(atk/def/spd/hp 등)를 캐릭터 스탯 키(str/end/agi/mana…)로 매핑
+        add('str',  m.str  ?? m.atk,  p.str  ?? p.atk);
+        add('end',  m.end  ?? m.def,  p.end  ?? p.def);
+        add('agi',  m.agi  ?? m.spd,  p.agi  ?? p.spd);
+        add('int',  m.int,            p.int);
+        add('mana', m.mana ?? m.hp,   p.mana ?? p.hp);
+        add('luck', m.luck,           p.luck);
+
+        // 실제로 기여한 스탯이 하나라도 있다면 출처 목록에 추가
+        if (Object.keys(c).length){
+          sources.push({
+            name: picked.name || '',
+            type: picked.type || '',
+            rank: picked.rank || '',
+            tags: picked.tags || '',
+            contrib: c
+          });
+        }
       });
-    }
-  });
 
-  return {flat, pct, sources};
-}
+      return {flat, pct, sources};
+    }
+
+    /* =========================================================
+     *  메인 렌더 함수
+     *  - 캐릭터 정보 / 장비 / 타임라인 / 스탯 / 스킬 그룹 출력
+     * ======================================================= */
 
     function render(){
       const list = loadMembers();
-      if(!list.length){ alert('멤버 데이터가 없습니다. member.html에서 캐릭터를 먼저 생성하세요.'); return; }
+      if(!list.length){
+        alert('멤버 데이터가 없습니다. member.html에서 캐릭터를 먼저 생성하세요.');
+        return;
+      }
+
       const ch = pickCharacter(list);
 
-      // Basic
+      /* -------- 기본 정보 출력 -------- */
       $('#cName').textContent = ch.name||'무명';
       $('#cNote').textContent = ch.note||'';
       $('#cRole').textContent = ch.role||'-';
       $('#cSub').textContent  = ch.sub||'-';
       $('#cImg').src = ch.img||'https://via.placeholder.com/420x560/1d1f26/777?text=NO+IMAGE';
 
-      // Equip
+      /* -------- 장비 정보 출력 -------- */
       const eq = ch.equip||{};
-      ['Glove','Pants','Shirt','Boots','Weapon'].forEach(k=>{ const el=$('#eq'+k); el.textContent = eq[k.toLowerCase()]||'-' });
+      ['Glove','Pants','Shirt','Boots','Weapon'].forEach(k=>{
+        const el=$('#eq'+k);
+        el.textContent = eq[k.toLowerCase()]||'-'
+      });
 
-      // Timeline
+      /* -------- 타임라인 출력 -------- */
       const tl = ch.timeline||[];
-      const tbox=$('#timelineBox'); tbox.innerHTML='';
+      const tbox=$('#timelineBox');
+      tbox.innerHTML='';
+
       if(!tl.length){
         tbox.innerHTML='<div class="timeline-entry">(기록 없음)</div>';
       }else{
@@ -483,10 +666,12 @@ function collectSkillMods(ch){
         });
       }
 
-      // Stats
-      const base = ch.stats||{};
-      const mods = collectSkillMods(ch);
+      /* -------- 스탯 계산 준비 -------- */
 
+      const base = ch.stats||{};       // 기본 스탯
+      const mods = collectSkillMods(ch); // 도감 기반 보정값
+
+      // 화면에 표시할 스탯 정의
       const statDefs = [
         {label:'근력', key:'str'},
         {label:'내구', key:'end'},
@@ -496,31 +681,47 @@ function collectSkillMods(ch){
         {label:'행운', key:'luck'}
       ];
 
+      // 각 스탯별 최종 값 계산
       const data = statDefs.map(({label,key:k})=>{
-        const dFlat = mods.flat[k]||0;
-        const dPct  = mods.pct[k]||0;
-        const baseVal = base[k]||0;
-        const delta = dFlat + Math.round(baseVal * (dPct/100));
-        const final = baseVal + delta;
-        return {label, key:k, base: baseVal, delta, final, grade: gradeFor(final)};
+        const dFlat   = mods.flat[k]||0;          // 특성/숙련도/권능이 주는 고정값
+        const dPct    = mods.pct[k]||0;           // 특성/숙련도/권능이 주는 % 보정
+        const baseVal = base[k]||0;               // 기본치
+        const delta   = dFlat + Math.round(baseVal * (dPct/100)); // 총 변화량
+        const final   = baseVal + delta;          // 최종치
+        return {
+          label,
+          key:k,
+          base: baseVal,
+          delta,
+          final,
+          grade: gradeFor(final)
+        };
       });
 
-      const maxFinal = Math.max(...data.map(d=>d.final), 1);
+      const maxFinal = Math.max(...data.map(d=>d.final), 1); // 그래프 스케일 기준
 
-      // 스탯별 툴팁 텍스트 생성
+      /* -------- 스탯별 툴팁 텍스트 생성 -------- */
+
       const tooltipMap = {};
       data.forEach(d=>{
+        // 이 스탯에 기여한 특성/숙련도/권능만 필터링
         const related = (mods.sources || []).filter(s => s.contrib && s.contrib[d.key]);
+
         if (!related.length){
-          tooltipMap[d.key] = `기본치: ${d.base}\n(이 스탯에는 현재 특성/숙련도/권능 보정이 적용되지 않습니다.)`;
+          tooltipMap[d.key] =
+            `기본치: ${d.base}\n` +
+            `(이 스탯에는 현재 특성/숙련도/권능 보정이 적용되지 않습니다.)`;
           return;
         }
+
         const lines = [];
         lines.push(`기본치: ${d.base}`);
+
         related.forEach(s=>{
           const c = s.contrib[d.key];
           const typeLabel = TYPE_LABELS[s.type] || s.type || '기타';
-          const rankText = s.rank ? ` [${s.rank}]` : '';
+          const rankText  = s.rank ? ` [${s.rank}]` : '';
+
           const parts = [];
           if (c.flat){
             parts.push(`${c.flat>0?'+':''}${c.flat}`);
@@ -530,65 +731,124 @@ function collectSkillMods(ch){
           }
           lines.push(`${typeLabel} ${s.name}${rankText}: ${parts.join(', ')}`);
         });
+
         tooltipMap[d.key] = lines.join('\n');
       });
 
-      // Render chart
-      const box=$('#statsBox'); box.innerHTML='';
+      /* -------- 스탯 박스 렌더링 (막대형 / 레이더 차트) -------- */
+
+      const box=$('#statsBox');
+      box.innerHTML='';
+
       if(window.chartMode==='radar'){
+        // 방사형(레이더) 차트
         box.appendChild(renderRadar(data, maxFinal, tooltipMap));
       }else{
+        // 막대형 리스트
         data.forEach(d=> box.appendChild(
           statRow(d.label, d.base, d.delta, maxFinal, tooltipMap[d.key])
         ));
       }
 
-      // Skills list grouped
-      const codex = loadCodex();
-      const byName = new Map(codex.map(x=>[((x.name||'')+'').toLowerCase(), x]));
-      const skillWrap=$('#skillWrap'); skillWrap.innerHTML='';
+      /* -------- 스킬/특성 리스트 그룹 출력 -------- */
 
-      const sections=[
-        {title:'특성', types:['trait']},
-        {title:'숙련도', types:['proficiency']},
-        {title:'기술/마법/스킬', types:['tech','magic','skill']},
-        {title:'가호/권능', types:['blessing','authority']}
+      const codex = loadCodex();
+
+      // id 와 이름 둘 다 인덱싱해 둔다
+      const codexById   = new Map(codex.map(x => [x.id, x]));
+      const codexByName = new Map(codex.map(x => [((x.name || '') + '').toLowerCase(), x]));
+
+      // 화면에서 보일 그룹 섹션 정의
+      const sections = [
+        {title:'특성',             types:['trait']},
+        {title:'숙련도',           types:['proficiency']},
+        {title:'기술/마법/스킬',   types:['tech','magic','skill']},
+        {title:'가호/권능',        types:['blessing','authority']}
       ];
 
-      // Prepare grouped items
-      const grouped = new Map(sections.map(s=>[s.title,[]]));
-      (ch.skills||[]).forEach(n=>{
-        const x = byName.get((n||'').toLowerCase());
-        if(!x){ // 미등록 항목은 기술/마법/스킬 그룹으로 임시 분류
-          (grouped.get('기술/마법/스킬')||[]).push({name:n});
+      // 섹션별 그룹 초기화 (Map: 섹션 제목 → 배열)
+      const grouped = new Map(sections.map(s => [s.title, []]));
+
+      // ch.skills 에서 도감 항목 찾아 그룹에 채우기
+      (ch.skills || []).forEach(s => {
+        let entry = null;
+        let plainName = '';
+
+        if (typeof s === 'string') {
+          // 옛 데이터: 이름만 문자열로 저장된 경우
+          plainName = s;
+          const key = s.toLowerCase();
+          entry = codexByName.get(key) || null;
+
+        } else if (s && typeof s === 'object') {
+          // 새 데이터: { name, rank, type, codexId }
+          plainName = s.name || '';
+
+          // codexId 우선 매칭
+          if (s.codexId && codexById.has(s.codexId)) {
+            entry = codexById.get(s.codexId);
+          } else {
+            // codexId가 없으면 이름으로 매칭
+            const key = (s.name || '').toLowerCase();
+            entry = codexByName.get(key) || null;
+          }
+        }
+
+        // 도감에서 못 찾은 항목은 "기술/마법/스킬" 그룹에 이름만 표시
+        if (!entry) {
+          (grouped.get('기술/마법/스킬') || []).push({ name: plainName });
           return;
         }
-        const sec = sections.find(s=> s.types.includes(x.type));
-        const key = sec? sec.title : '기술/마법/스킬';
-        (grouped.get(key)||[]).push(x);
+
+        const sec = sections.find(sec => sec.types.includes(entry.type));
+        const keyTitle = sec ? sec.title : '기술/마법/스킬';
+        (grouped.get(keyTitle) || []).push(entry);
       });
 
-      // Render
-      sections.forEach(sec=>{
-        const arr = grouped.get(sec.title)||[];
-        if(!arr.length) return;
-        const box=document.createElement('div'); box.className='group';
-        box.innerHTML = `<h4 class='gtitle'>${sec.title}</h4><div class='plist'></div>`;
-        const plist=box.querySelector('.plist');
-        arr.forEach(x=>{
-          const pill=document.createElement('span'); pill.className='pill';
-          if(x.type){
-            pill.innerHTML = `<span>${x.name}${x.rank?` <span class="badge" data-rank="${x.rank}">${x.rank}</span>`:''}</span><span class="tag">${TYPE_LABELS[x.type]||x.type}${x.tags?` · ${x.tags}`:''}</span>`;
+      // 실제 DOM에 출력
+      const skillWrap = $('#skillWrap');
+      skillWrap.innerHTML = '';
+
+      sections.forEach(sec => {
+        const arr = grouped.get(sec.title) || [];
+        if (!arr.length) return;
+
+        const box = document.createElement('div');
+        box.className = 'group';
+        box.innerHTML = `
+          <h4 class='gtitle'>${sec.title}</h4>
+          <div class='plist'></div>
+        `;
+        const plist = box.querySelector('.plist');
+
+        arr.forEach(x => {
+          const pill = document.createElement('span');
+          pill.className = 'pill';
+
+          if (x.type) {
+            // 도감에 존재하는 항목: 등급 배지 + 타입/태그 표시
+            pill.innerHTML =
+              `<span>${x.name}` +
+              `${x.rank ? ` <span class="badge" data-rank="${x.rank}">${x.rank}</span>` : ''}` +
+              `</span><span class="tag">` +
+              `${TYPE_LABELS[x.type] || x.type}` +
+              `${x.tags ? ` · ${x.tags}` : ''}</span>`;
           } else {
-            pill.textContent = x.name||'';
+            // 도감에 없는 이름만 있는 항목
+            pill.textContent = x.name || '';
           }
           plist.appendChild(pill);
         });
+
         skillWrap.appendChild(box);
       });
-    };
+    }
 
-    // 차트 모드 초기값 및 토글 버튼 설정
+    /* =========================================================
+     *  차트 모드(막대형 / 방사형) 설정 및 토글 버튼
+     * ======================================================= */
+
+    // 차트 모드 초기값 (localStorage → 'bar' 또는 'radar')
     try{
       window.chartMode = localStorage.getItem(CMODE) || 'bar';
     }catch(e){
@@ -596,10 +856,17 @@ function collectSkillMods(ch){
     }
 
     const chartToggleBtn = document.getElementById('chartToggle');
+
+    // 버튼 라벨을 현재 모드에 맞게 갱신
     function updateChartToggleLabel(){
       if(!chartToggleBtn) return;
-      chartToggleBtn.textContent = (window.chartMode === 'radar') ? '막대형 보기' : '방사형 보기';
+      chartToggleBtn.textContent =
+        (window.chartMode === 'radar')
+          ? '막대형 보기'
+          : '방사형 보기';
     }
+
+    // 버튼 클릭 시 모드 토글 + 렌더링
     if(chartToggleBtn){
       chartToggleBtn.addEventListener('click', ()=>{
         window.chartMode = (window.chartMode === 'radar') ? 'bar' : 'radar';
@@ -610,39 +877,98 @@ function collectSkillMods(ch){
       updateChartToggleLabel();
     }
 
+    // 페이지 최초 렌더
     render();
 
+    /* =========================================================
+     *  방사형(레이더) 차트 렌더링
+     * ======================================================= */
+
+    /**
+     * 레이더 차트 DOM 생성
+     * @param {Array} data - 각 스탯 정보 {label,key,base,delta,final,grade}
+     * @param {number} max - 레이더 최대 스케일 기준값
+     * @param {Object} tooltipMap - 스탯 키별 툴팁 텍스트
+     */
     function renderRadar(data, max, tooltipMap){
       const wrap=document.createElement('div');
       wrap.className='radarWrap';
+
       const n=data.length;
       const size=320;
       const cx=size/2, cy=size/2;
       const r=120;
       const svgNS='http://www.w3.org/2000/svg';
+
       const holder=document.createElement('div');
       holder.className='radar';
+
       const svg=document.createElementNS(svgNS,'svg');
       svg.setAttribute('viewBox',`0 0 ${size} ${size}`);
-      // grid circles
-      [0.25,0.5,0.75,1].forEach(p=>{ const c=document.createElementNS(svgNS,'circle'); c.setAttribute('cx',cx); c.setAttribute('cy',cy); c.setAttribute('r',r*p); c.setAttribute('fill','none'); c.setAttribute('stroke','rgba(255,255,255,.1)'); svg.appendChild(c) });
-      // axes
-      data.forEach((d,i)=>{ const ang=(-90 + i*(360/n)) * Math.PI/180; const x2=cx + r*Math.cos(ang); const y2=cy + r*Math.sin(ang); const ax=document.createElementNS(svgNS,'line'); ax.setAttribute('x1',cx); ax.setAttribute('y1',cy); ax.setAttribute('x2',x2); ax.setAttribute('y2',y2); ax.setAttribute('stroke','rgba(255,255,255,.12)'); svg.appendChild(ax); });
-      // polygon
-      const pts=data.map((d,i)=>{ const ang=(-90 + i*(360/n)) * Math.PI/180; const rr=r * (d.final/max); const x=cx + rr*Math.cos(ang); const y=cy + rr*Math.sin(ang); return `${x},${y}`; }).join(' ');
-      const poly=document.createElementNS(svgNS,'polygon'); poly.setAttribute('points',pts); poly.setAttribute('fill','rgba(212,175,55,.28)'); poly.setAttribute('stroke','rgba(212,175,55,.9)'); poly.setAttribute('stroke-width','2'); svg.appendChild(poly);
-      holder.appendChild(svg); wrap.appendChild(holder);
 
-      // legend
-      const lg=document.createElement('div'); lg.className='legend';
+      // 배경 그리드(동심원)
+      [0.25,0.5,0.75,1].forEach(p=>{
+        const c=document.createElementNS(svgNS,'circle');
+        c.setAttribute('cx',cx);
+        c.setAttribute('cy',cy);
+        c.setAttribute('r',r*p);
+        c.setAttribute('fill','none');
+        c.setAttribute('stroke','rgba(255,255,255,.1)');
+        svg.appendChild(c)
+      });
+
+      // 각 스탯 축(중심 → 외곽선)
+      data.forEach((d,i)=>{
+        const ang=(-90 + i*(360/n)) * Math.PI/180;
+        const x2=cx + r*Math.cos(ang);
+        const y2=cy + r*Math.sin(ang);
+        const ax=document.createElementNS(svgNS,'line');
+        ax.setAttribute('x1',cx);
+        ax.setAttribute('y1',cy);
+        ax.setAttribute('x2',x2);
+        ax.setAttribute('y2',y2);
+        ax.setAttribute('stroke','rgba(255,255,255,.12)');
+        svg.appendChild(ax);
+      });
+
+      // 실제 스탯을 나타내는 다각형
+      const pts=data.map((d,i)=>{
+        const ang=(-90 + i*(360/n)) * Math.PI/180;
+        const rr=r * (d.final/max);
+        const x=cx + rr*Math.cos(ang);
+        const y=cy + rr*Math.sin(ang);
+        return `${x},${y}`;
+      }).join(' ');
+
+      const poly=document.createElementNS(svgNS,'polygon');
+      poly.setAttribute('points',pts);
+      poly.setAttribute('fill','rgba(212,175,55,.28)');
+      poly.setAttribute('stroke','rgba(212,175,55,.9)');
+      poly.setAttribute('stroke-width','2');
+      svg.appendChild(poly);
+
+      holder.appendChild(svg);
+      wrap.appendChild(holder);
+
+      // 오른쪽에 간단한 레전드(최종치 / 변화량 / 등급)
+      const lg=document.createElement('div');
+      lg.className='legend';
+
       data.forEach(d=>{
         const row=document.createElement('div');
-        row.innerHTML=`<strong>${d.label} [${d.grade}]</strong><div style="font-size:.8rem;color:${d.delta? (d.delta>0?'#7ce085':'#f48fb1'):'#ccc'}">${d.final}${d.delta?` (${d.delta>0?'+':''}${d.delta})`:''}</div>`;
+        row.innerHTML=
+          `<strong>${d.label} [${d.grade}]</strong>` +
+          `<div style="font-size:.8rem;color:${d.delta? (d.delta>0?'#7ce085':'#f48fb1'):'#ccc'}">` +
+          `${d.final}${d.delta?` (${d.delta>0?'+':''}${d.delta})`:''}` +
+          `</div>`;
+
+        // 마우스 오버 시, 해당 스탯의 특성/숙련도/권능 기여 내역 툴팁
         if (tooltipMap && tooltipMap[d.key]){
           row.title = tooltipMap[d.key];
         }
         lg.appendChild(row);
       });
+
       wrap.appendChild(lg);
       return wrap;
     }
