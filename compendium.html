@@ -222,129 +222,494 @@
     </main>
   </div>
 
-  <script>
-    const KEY='codex.v1';
-    const $=s=>document.querySelector(s);
-    const listEl=$('#list'); 
-    const emptyEl=$('#empty'); 
-    const drawer=$('#drawer');
-    const q=$('#q'); 
-    const importInput=$('#importInput'); 
-    const sortSel=$('#sortSel'); 
-    const rankSel=$('#rankSel'); 
-    const clearBtn=$('#clearBtn');
-    const tagChips=$('#tagChips');
+    <script>
+    /* =========================================================
+     *  상수 / 공통 DOM 참조
+     * ======================================================= */
 
-    const TYPE_LABELS={
-      trait:'특성', tech:'기술', magic:'마법', skill:'스킬', authority:'권능', blessing:'가호', proficiency:'숙련도'
+    // localStorage 키
+    const KEY = 'codex.v1';
+
+    // 단축 querySelector
+    const $ = s => document.querySelector(s);
+
+    // 목록 영역 / 비어있을 때 안내문
+    const listEl  = $('#list');
+    const emptyEl = $('#empty');
+
+    // 오른쪽 편집 드로어
+    const drawer = $('#drawer');
+
+    // 검색 / 필터 / 정렬 관련 요소
+    const q          = $('#q');
+    const importInput = $('#importInput');
+    const sortSel    = $('#sortSel');
+    const rankSel    = $('#rankSel');
+    const clearBtn   = $('#clearBtn');
+    const tagChips   = $('#tagChips');
+
+    // 타입 → 한글 라벨
+    const TYPE_LABELS = {
+      trait:       '특성',
+      tech:        '기술',
+      magic:       '마법',
+      skill:       '스킬',
+      authority:   '권능',
+      blessing:    '가호',
+      proficiency: '숙련도'
     };
-    const RANK_ORDER=[
-      "EX","SSS","SS","S+","S","A++","A+","A","A-","B++","B+","B","B-","C++","C+","C","C-","D++","D+","D","D-","F++","F+","F","F-"
+
+    // 등급 정렬 기준 (앞으로 갈수록 높은 등급)
+    const RANK_ORDER = [
+      "EX","SSS","SS","S+","S",
+      "A++","A+","A","A-",
+      "B++","B+","B","B-",
+      "C++","C+","C","C-",
+      "D++","D+","D","D-",
+      "F++","F+","F","F-"
     ];
-    const rankIndex = r=>{ const i=RANK_ORDER.indexOf(r||''); return i<0?999:i };
 
-    const f={ type:$('#fType'), name:$('#fName'), icon:$('#fIcon'), iconFile:$('#fIconFile'), iconPrev:$('#iconPreview'), desc:$('#fDesc'), tags:$('#fTags'), rank:$('#fRank'),
-      mStr:$('#mStr'), mEnd:$('#mEnd'), mAgi:$('#mAgi'), mInt:$('#mInt'), mMana:$('#mMana'), mLuck:$('#mLuck'),
-      mStrP:$('#mStrP'), mEndP:$('#mEndP'), mAgiP:$('#mAgiP'), mIntP:$('#mIntP'), mManaP:$('#mManaP'), mLuckP:$('#mLuckP') };
+    // 등급 문자열 → 인덱스 (숫자가 작을수록 높은 등급, 미지정시 999)
+    const rankIndex = r => {
+      const i = RANK_ORDER.indexOf(r || '');
+      return i < 0 ? 999 : i;
+    };
 
-    function uid(){return Math.random().toString(36).slice(2,9)}
-    function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]') }catch{ return [] } }
-    function save(data){ localStorage.setItem(KEY, JSON.stringify(data)); }
+    /* =========================================================
+     *  폼 요소 모음 (드로어 내부)
+     * ======================================================= */
 
-    let data=load();
-    let current=null; const activeTags=new Set();
+    // 드로어 안의 입력 요소들을 한 객체로 모아둠
+    const f = {
+      type:     $('#fType'),
+      name:     $('#fName'),
+      icon:     $('#fIcon'),
+      iconFile: $('#fIconFile'),
+      iconPrev: $('#iconPreview'),
+      desc:     $('#fDesc'),
+      tags:     $('#fTags'),
+      rank:     $('#fRank'),
 
+      // 고정값 보정
+      mStr:  $('#mStr'),
+      mEnd:  $('#mEnd'),
+      mAgi:  $('#mAgi'),
+      mInt:  $('#mInt'),
+      mMana: $('#mMana'),
+      mLuck: $('#mLuck'),
+
+      // % 보정
+      mStrP:  $('#mStrP'),
+      mEndP:  $('#mEndP'),
+      mAgiP:  $('#mAgiP'),
+      mIntP:  $('#mIntP'),
+      mManaP: $('#mManaP'),
+      mLuckP: $('#mLuckP')
+    };
+
+    /* =========================================================
+     *  데이터 로드/저장 유틸
+     * ======================================================= */
+
+    // 간단한 id 생성기
+    function uid(){
+      return Math.random().toString(36).slice(2, 9);
+    }
+
+    // localStorage에서 도감 데이터 로드
+    function load(){
+      try{
+        return JSON.parse(localStorage.getItem(KEY) || '[]');
+      }catch{
+        return [];
+      }
+    }
+
+    // localStorage에 도감 데이터 저장
+    function save(data){
+      localStorage.setItem(KEY, JSON.stringify(data));
+    }
+
+    // 실제 메모리 상의 도감 배열
+    let data = load();
+
+    // 현재 드로어에서 편집 중인 항목
+    let current = null;
+
+    // 활성화된 태그 필터 집합 (소문자 기준)
+    const activeTags = new Set();
+
+    /* =========================================================
+     *  태그 칩(Chips) 생성 및 관리
+     * ======================================================= */
+
+    // 데이터 전체를 훑어서 태그 목록을 만들고 칩 UI를 구성
     function buildTagChips(){
-      const map=new Map();
-      data.forEach(x=> (x.tags||'').split(/\s*,\s*/).forEach(t=>{ if(!t) return; const k=t.toLowerCase(); map.set(k,(map.get(k)||0)+1) }));
-      const tags=[...map.entries()].sort((a,b)=> a[0].localeCompare(b[0],'ko')).slice(0,60);
-      tagChips.innerHTML='';
-      tags.forEach(([t,count])=>{
-        const b=document.createElement('button'); b.className='chip'; b.textContent=`#${t}`; b.title=`${count}개 포함`;
+      const map = new Map();
+
+      // 태그 카운트 집계
+      data.forEach(x => {
+        (x.tags || '')
+          .split(/\s*,\s*/)
+          .forEach(t => {
+            if(!t) return;
+            const k = t.toLowerCase();
+            map.set(k, (map.get(k) || 0) + 1);
+          });
+      });
+
+      // 정렬된 태그 목록 (최대 60개까지)
+      const tags = [...map.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0], 'ko'))
+        .slice(0, 60);
+
+      tagChips.innerHTML = '';
+
+      tags.forEach(([t, count]) => {
+        const b = document.createElement('button');
+        b.className  = 'chip';
+        b.textContent = `#${t}`;
+        b.title       = `${count}개 포함`;
+
         if(activeTags.has(t)) b.classList.add('active');
-        b.onclick=()=>{ if(activeTags.has(t)) activeTags.delete(t); else activeTags.add(t); render(currentFilter()); };
+
+        b.onclick = () => {
+          if(activeTags.has(t)) activeTags.delete(t);
+          else activeTags.add(t);
+          render(currentFilter());
+        };
+
         tagChips.appendChild(b);
       });
     }
 
-    function currentFilter(){ return document.querySelector('.mbtn.active')?.dataset.filter||'all' }
+    /* =========================================================
+     *  현재 선택된 종류 필터 (좌측 사이드 메뉴)
+     * ======================================================= */
+
+    function currentFilter(){
+      return document.querySelector('.mbtn.active')?.dataset.filter || 'all';
+    }
+
+    /* =========================================================
+     *  검색/필터/정렬을 적용한 결과 배열 계산
+     * ======================================================= */
 
     function filteredSorted(filter){
-      const term=(q.value||'').toLowerCase();
-      let arr=data.filter(x=> (filter==='all'||x.type===filter) && (
-        x.name.toLowerCase().includes(term) || (x.tags||'').toLowerCase().includes(term) || (x.rank||'').toLowerCase().includes(term)
-      ));
-      if(rankSel.value){ arr = arr.filter(x=> (x.rank||'')===rankSel.value); }
+      const term = (q.value || '').toLowerCase();
+
+      // 1차 필터링: 종류 + 검색어(이름/태그/등급)
+      let arr = data.filter(x =>
+        (filter === 'all' || x.type === filter) &&
+        (
+          x.name.toLowerCase().includes(term) ||
+          (x.tags || '').toLowerCase().includes(term) ||
+          (x.rank || '').toLowerCase().includes(term)
+        )
+      );
+
+      // 등급 필터 추가 적용
+      if(rankSel.value){
+        arr = arr.filter(x => (x.rank || '') === rankSel.value);
+      }
+
+      // 태그 칩 필터 적용
       if(activeTags.size){
-        arr = arr.filter(x=>{
-          const tags=(x.tags||'').split(/\s*,\s*/).map(s=>s.toLowerCase()).filter(Boolean);
-          for(const t of activeTags){ if(tags.includes(t)) return true; }
+        arr = arr.filter(x => {
+          const tags = (x.tags || '')
+            .split(/\s*,\s*/)
+            .map(s => s.toLowerCase())
+            .filter(Boolean);
+
+          for(const t of activeTags){
+            if(tags.includes(t)) return true;
+          }
           return false;
         });
       }
-      const sort=sortSel.value;
-      if(sort==='name') arr.sort((a,b)=> a.name.localeCompare(b.name,'ko'));
-      else if(sort==='tag'){
-        const firstTag = o=> (o.tags||'').split(/\s*,\s*/).filter(Boolean)[0]||'';
-        arr.sort((a,b)=> firstTag(a).localeCompare(firstTag(b),'ko') || a.name.localeCompare(b.name,'ko'));
-      } else if(sort==='rankDesc'){
-        arr.sort((a,b)=> rankIndex(a.rank) - rankIndex(b.rank) || a.name.localeCompare(b.name,'ko'));
+
+      // 정렬 방식 적용
+      const sort = sortSel.value;
+
+      if(sort === 'name'){
+        // 이름 가나다 순
+        arr.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+      }else if(sort === 'tag'){
+        // 첫 태그 기준 그룹 정렬 → 그 안에서 이름순
+        const firstTag = o =>
+          (o.tags || '')
+            .split(/\s*,\s*/)
+            .filter(Boolean)[0] || '';
+
+        arr.sort((a, b) =>
+          firstTag(a).localeCompare(firstTag(b), 'ko') ||
+          a.name.localeCompare(b.name, 'ko')
+        );
+      }else if(sort === 'rankDesc'){
+        // 등급 높은 순 → 이름순
+        arr.sort((a, b) =>
+          rankIndex(a.rank) - rankIndex(b.rank) ||
+          a.name.localeCompare(b.name, 'ko')
+        );
       }
+
       return arr;
     }
 
-    function render(filter='all'){
+    /* =========================================================
+     *  메인 목록 렌더링
+     * ======================================================= */
+
+    /**
+     * 도감 카드들을 화면에 그리는 함수
+     * @param {string} filter - 'all' / 'trait' / 'tech' … (좌측 카테고리)
+     */
+    function render(filter = 'all'){
       const arr = filteredSorted(filter);
-      listEl.innerHTML=''; emptyEl.style.display = arr.length? 'none':'block';
-      arr.forEach(x=>{
-        const card=document.createElement('div'); card.className='card'; card.onclick=()=>openDrawer(x.id);
-        card.innerHTML=`<div class='thumb' style="background-image:url('${x.icon||''}')"></div>
-                        <div class='meta'><div style='font-weight:700'>${x.name}${x.rank?` <span class=\"badge\" data-rank=\"${x.rank}\">${x.rank}</span>`:''}</div>
-                        <div class='tag'>${TYPE_LABELS[x.type]||x.type} · ${(x.tags||'')}</div></div>`;
+
+      listEl.innerHTML = '';
+      emptyEl.style.display = arr.length ? 'none' : 'block';
+
+      arr.forEach(x => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick   = () => openDrawer(x.id);
+
+        card.innerHTML = `
+          <div class="thumb" style="background-image:url('${x.icon || ''}')"></div>
+          <div class="meta">
+            <div style="font-weight:700">
+              ${x.name}
+              ${x.rank
+                ? ` <span class="badge" data-rank="${x.rank}">${x.rank}</span>`
+                : ''
+              }
+            </div>
+            <div class="tag">
+              ${(TYPE_LABELS[x.type] || x.type)} · ${(x.tags || '')}
+            </div>
+          </div>
+        `;
+
         listEl.appendChild(card);
-      })
+      });
     }
 
+    /* =========================================================
+     *  드로어 열기/닫기 및 값 채우기
+     * ======================================================= */
+
+    /**
+     * 드로어 열기 (id 없으면 새 항목으로 열기)
+     */
     function openDrawer(id){
-      const item = data.find(x=>x.id===id);
-      current = item || {id:uid(), type:'trait', name:'', icon:'', desc:'', tags:'', rank:'', mod:{}, modP:{}};
-      $('#dwTitle').textContent = item? '항목 수정' : '새 항목';
-      f.type.value=current.type; f.name.value=current.name; f.icon.value=current.icon; f.desc.value=current.desc; f.tags.value=current.tags||''; f.rank.value=current.rank||''; f.iconPrev.src=current.icon||'';
-      const m=current.mod||{}; const p=current.modP||{};
-      // 호환: 이전 키(atk/def/spd/hp)도 읽어서 채우기
-      f.mStr.value = m.str ?? m.atk ?? 0; f.mEnd.value = m.end ?? m.def ?? 0; f.mAgi.value = m.agi ?? m.spd ?? 0; f.mInt.value = m.int ?? 0; f.mMana.value = m.mana ?? m.hp ?? 0; f.mLuck.value = m.luck ?? 0;
-      f.mStrP.value = p.str ?? p.atk ?? 0; f.mEndP.value = p.end ?? p.def ?? 0; f.mAgiP.value = p.agi ?? p.spd ?? 0; f.mIntP.value = p.int ?? 0; f.mManaP.value = p.mana ?? p.hp ?? 0; f.mLuckP.value = p.luck ?? 0;
+      const item = data.find(x => x.id === id);
+
+      // 편집 중인 항목 정보 세팅
+      current = item || {
+        id:   uid(),
+        type: 'trait',
+        name: '',
+        icon: '',
+        desc: '',
+        tags: '',
+        rank: '',
+        mod:  {},
+        modP: {}
+      };
+
+      $('#dwTitle').textContent = item ? '항목 수정' : '새 항목';
+
+      // 기본 필드들
+      f.type.value = current.type;
+      f.name.value = current.name;
+      f.icon.value = current.icon;
+      f.desc.value = current.desc;
+      f.tags.value = current.tags || '';
+      f.rank.value = current.rank || '';
+      f.iconPrev.src = current.icon || '';
+
+      // 스탯 보정 값 (기존 키 호환: atk/def/spd/hp → str/end/agi/mana)
+      const m = current.mod  || {};
+      const p = current.modP || {};
+
+      // 고정값
+      f.mStr.value  = m.str  ?? m.atk ?? 0;
+      f.mEnd.value  = m.end  ?? m.def ?? 0;
+      f.mAgi.value  = m.agi  ?? m.spd ?? 0;
+      f.mInt.value  = m.int  ?? 0;
+      f.mMana.value = m.mana ?? m.hp  ?? 0;
+      f.mLuck.value = m.luck ?? 0;
+
+      // % 보정
+      f.mStrP.value  = p.str  ?? p.atk ?? 0;
+      f.mEndP.value  = p.end  ?? p.def ?? 0;
+      f.mAgiP.value  = p.agi  ?? p.spd ?? 0;
+      f.mIntP.value  = p.int  ?? 0;
+      f.mManaP.value = p.mana ?? p.hp  ?? 0;
+      f.mLuckP.value = p.luck ?? 0;
+
+      // 드로어 표시
       drawer.classList.add('show');
-      if(f.iconFile){ f.iconFile.onchange = (e)=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onload=()=>{ f.icon.value=r.result; f.iconPrev.src=r.result; }; r.readAsDataURL(file) }; }
-      if(f.icon){ f.icon.oninput = ()=>{ f.iconPrev.src = f.icon.value; } }
+
+      // 아이콘 파일 업로드 → base64 로 미리보기/저장
+      if(f.iconFile){
+        f.iconFile.onchange = e => {
+          const file = e.target.files?.[0];
+          if(!file) return;
+
+          const r = new FileReader();
+          r.onload = () => {
+            f.icon.value     = r.result;
+            f.iconPrev.src   = r.result;
+          };
+          r.readAsDataURL(file);
+        };
+      }
+
+      // 아이콘 URL 직접 입력 시 미리보기 갱신
+      if(f.icon){
+        f.icon.oninput = () => {
+          f.iconPrev.src = f.icon.value;
+        };
+      }
     }
 
-    function closeDrawer(){ drawer.classList.remove('show') }
+    // 드로어 닫기
+    function closeDrawer(){
+      drawer.classList.remove('show');
+    }
 
+    /* =========================================================
+     *  드로어 → data 반영 & 저장
+     * ======================================================= */
+
+    /**
+     * 현재 드로어의 내용을 data 배열에 반영하고 localStorage 에 저장
+     */
     function persist(){
-      const idx = data.findIndex(x=>x.id===current.id);
-      const entry = { id: current.id, type:f.type.value, name:f.name.value.trim(), icon:f.icon.value.trim(), desc:f.desc.value.trim(), tags:f.tags.value.trim(), rank:f.rank.value,
+      const idx = data.findIndex(x => x.id === current.id);
+
+      // 폼의 값을 읽어서 하나의 entry로 구성
+      const entry = {
+        id:   current.id,
+        type: f.type.value,
+        name: f.name.value.trim(),
+        icon: f.icon.value.trim(),
+        desc: f.desc.value.trim(),
+        tags: f.tags.value.trim(),
+        rank: f.rank.value,
+
         // 새 키로 저장 (str/end/agi/int/mana/luck)
-        mod: { str:+f.mStr.value||0, end:+f.mEnd.value||0, agi:+f.mAgi.value||0, int:+f.mInt.value||0, mana:+f.mMana.value||0, luck:+f.mLuck.value||0 },
-        modP: { str:+f.mStrP.value||0, end:+f.mEndP.value||0, agi:+f.mAgiP.value||0, int:+f.mIntP.value||0, mana:+f.mManaP.value||0, luck:+f.mLuckP.value||0 } };
-      if(idx>=0) data[idx]=entry; else data.push(entry);
-      save(data); buildTagChips(); render(currentFilter()); closeDrawer();
+        mod: {
+          str:  +f.mStr.value  || 0,
+          end:  +f.mEnd.value  || 0,
+          agi:  +f.mAgi.value  || 0,
+          int:  +f.mInt.value  || 0,
+          mana: +f.mMana.value || 0,
+          luck: +f.mLuck.value || 0
+        },
+        modP: {
+          str:  +f.mStrP.value  || 0,
+          end:  +f.mEndP.value  || 0,
+          agi:  +f.mAgiP.value  || 0,
+          int:  +f.mIntP.value  || 0,
+          mana: +f.mManaP.value || 0,
+          luck: +f.mLuckP.value || 0
+        }
+      };
+
+      // 기존 항목이면 교체, 아니면 새로 추가
+      if(idx >= 0) data[idx] = entry;
+      else         data.push(entry);
+
+      // 저장 & UI 갱신
+      save(data);
+      buildTagChips();
+      render(currentFilter());
+      closeDrawer();
     }
 
-    // Events
-    document.querySelectorAll('.mbtn[data-filter]').forEach(b=> b.onclick=()=>{ document.querySelectorAll('.mbtn[data-filter]').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render(b.dataset.filter) });
-    $('#addBtn').onclick=()=> openDrawer(null);
-    $('#closeDw').onclick=closeDrawer; $('#saveDw').onclick=persist;
+    /* =========================================================
+     *  이벤트 바인딩
+     * ======================================================= */
 
-    q.oninput=()=> render(currentFilter());
-    sortSel.onchange=()=> render(currentFilter());
-    rankSel.onchange=()=> render(currentFilter());
-    clearBtn.onclick=()=>{ activeTags.clear(); q.value=''; rankSel.value=''; buildTagChips(); render('all'); };
+    // 좌측 종류 필터 버튼들
+    document
+      .querySelectorAll('.mbtn[data-filter]')
+      .forEach(b => {
+        b.onclick = () => {
+          document
+            .querySelectorAll('.mbtn[data-filter]')
+            .forEach(x => x.classList.remove('active'));
 
-    $('#exportBtn').onclick=()=>{ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='codex.json'; a.click(); URL.revokeObjectURL(a.href) };
-    importInput.onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const arr=JSON.parse(r.result); if(Array.isArray(arr)){ data=arr; save(data); buildTagChips(); render(currentFilter()); } }catch{} }; r.readAsText(f) };
+          b.classList.add('active');
+          render(b.dataset.filter);
+        };
+      });
 
-    // Init
+    // 새 항목 추가
+    $('#addBtn').onclick = () => openDrawer(null);
+
+    // 드로어 닫기/저장
+    $('#closeDw').onclick = closeDrawer;
+    $('#saveDw').onclick  = persist;
+
+    // 검색어 입력 시 즉시 반영
+    q.oninput = () => render(currentFilter());
+
+    // 정렬 / 등급 필터 변경
+    sortSel.onchange = () => render(currentFilter());
+    rankSel.onchange = () => render(currentFilter());
+
+    // 필터 초기화 버튼
+    clearBtn.onclick = () => {
+      activeTags.clear();
+      q.value = '';
+      rankSel.value = '';
+      buildTagChips();
+      render('all');
+    };
+
+    // JSON 내보내기
+    $('#exportBtn').onclick = () => {
+      const blob = new Blob(
+        [JSON.stringify(data, null, 2)],
+        { type: 'application/json' }
+      );
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'codex.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    // JSON 불러오기
+    importInput.onchange = e => {
+      const file = e.target.files?.[0];
+      if(!file) return;
+
+      const r = new FileReader();
+      r.onload = () => {
+        try{
+          const arr = JSON.parse(r.result);
+          if(Array.isArray(arr)){
+            data = arr;
+            save(data);
+            buildTagChips();
+            render(currentFilter());
+          }
+        }catch{
+          // 파싱 실패 시 조용히 무시
+        }
+      };
+      r.readAsText(file);
+    };
+
+    /* =========================================================
+     *  초기 렌더링
+     * ======================================================= */
+
     render('all');
     buildTagChips();
   </script>
