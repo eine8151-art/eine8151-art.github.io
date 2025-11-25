@@ -273,16 +273,22 @@
   <div class="app" id="app">
     <div class="stars"></div>
 
-    <div class="topbar">
-      <div class="chip"><strong>100G</strong></div>
-      <div class="chip"><i class="fa-regular fa-compass"></i> <span id="points">탐색포인트 12/12</span></div>
-      <div class="sep"></div>
-      <!-- ✨ 새로 추가된 도감 버튼 -->
-      <a href="compendium.html" class="chip link" title="스킬·특성 도감"><i class="fa-regular fa-bookmark"></i> 도감</a>
-      <div class="sep"></div>
-      <a href="member.html" class="chip link" title="단원 관리"><i class="fa-regular fa-user"></i> MEMBER</a>
-      <a href="character.html" class="chip link" title="프로필"><i class="fa-regular fa-id-card"></i> PROFILE</a>
-    </div>
+  <div class="topbar">
+    <div class="chip"><strong>100G</strong></div>
+    <div class="chip"><i class="fa-regular fa-compass"></i> <span id="points">탐색포인트 12/12</span></div>
+
+    <!-- 🔹 상점 버튼 (상단) -->
+    <a href="shop.html" class="chip link" title="상점">
+      <i class="fa-solid fa-store"></i> SHOP
+    </a>
+
+    <div class="sep"></div>
+    <!-- ✨ 도감 버튼 -->
+    <a href="compendium.html" class="chip link" title="스킬·특성 도감"><i class="fa-regular fa-bookmark"></i> 도감</a>
+    <div class="sep"></div>
+    <a href="member.html" class="chip link" title="단원 관리"><i class="fa-regular fa-user"></i> MEMBER</a>
+    <a href="character.html" class="chip link" title="프로필"><i class="fa-regular fa-id-card"></i> PROFILE</a>
+  </div>
 
     <aside class="sidebar">
       <!-- 🔧 여기: 대표 캐릭터 정보를 반영할 수 있도록 id 추가 -->
@@ -333,12 +339,30 @@
     </section>
 
     <nav class="bottomnav">
-      <button class="navbtn" onclick="location.href='member.html'"><i class="fa-regular fa-user"></i><span>MEMBER</span></button>
-      <button class="navbtn" onclick="location.href='character.html'"><i class="fa-regular fa-id-card"></i><span>PROFILE</span></button>
-      <button class="navbtn" onclick="location.href='compendium.html'"><i class="fa-regular fa-bookmark"></i><span>도감</span></button>
-      <button class="navbtn" onclick="location.href='battle.html'"><i class="fa-solid fa-swords"></i><span>BATTLE</span></button>
+      <button class="navbtn" onclick="location.href='member.html'">
+        <i class="fa-regular fa-user"></i><span>MEMBER</span>
+      </button>
+      <button class="navbtn" onclick="location.href='character.html'">
+        <i class="fa-regular fa-id-card"></i><span>PROFILE</span>
+      </button>
+      <button class="navbtn" onclick="location.href='compendium.html'">
+        <i class="fa-regular fa-bookmark"></i><span>도감</span>
+      </button>
+      <button class="navbtn" onclick="location.href='battle.html'">
+        <i class="fa-solid fa-swords"></i><span>BATTLE</span>
+      </button>
 
+      <!-- 🔹 장비 페이지 버튼 -->
+      <button class="navbtn" onclick="location.href='equipment.html'">
+        <i class="fa-solid fa-shield-halved"></i><span>EQUIP</span>
+      </button>
+
+      <!-- 🔹 인벤토리 페이지 버튼 -->
+      <button class="navbtn" onclick="location.href='inventory.html'">
+        <i class="fa-solid fa-box-open"></i><span>INVENTORY</span>
+      </button>
     </nav>
+
   </div>
 
   <script>
