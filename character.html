@@ -158,7 +158,7 @@
       return list[0];
     }
 
-    function statRow(label, base, delta, maxRef){
+    function statRow(label, base, delta, maxRef, tooltip){
       const row=document.createElement('div'); row.className='statrow';
       const final = (base||0) + (delta||0);
       const grade = gradeFor(final);
@@ -167,6 +167,12 @@
       row.innerHTML = `<span>${label} [${grade}]</span>
         <div class='bar'><span style='width:${Math.min(100, (final/maxVal)*100)}%'></span></div>
         <div class='delta'>${final}${signed?` <span style='color:${delta>0?'#7ce085':'#f48fb1'}'>(${signed})</span>`:''}</div>`;
+
+      // 스탯 이름 위에 툴팁 달기
+      if (tooltip){
+        const nameSpan = row.querySelector('span');
+        if (nameSpan) nameSpan.title = tooltip;
+      }
       return row;
     }
 
@@ -174,7 +180,8 @@
 const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']);
 
 // 이름이 같은 항목이 여러 개 있을 때
-// → 같은 이름에서는 "가장 높은 등급(랭크)" 하나만 적용하도록 변경
+// → 같은 이름에서는 "가장 높은 등급(랭크)" 하나만 적용
+// + 각 스탯에 어떤 출처가 기여했는지까지 기록
 function collectSkillMods(ch){
   const names = ch.skills || [];
   const codex = loadCodex();
@@ -182,6 +189,9 @@ function collectSkillMods(ch){
 
   const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
   const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+
+  // 출처별 기여도 기록용
+  const sources = []; // {name,type,rank,tags,contrib:{str:{flat,pct}, ...}}
 
   // 1) 이름별로 가장 좋은(랭크가 높은) 항목 하나만 고르기
   const pickedByName = new Map();
@@ -204,29 +214,41 @@ function collectSkillMods(ch){
     }
   });
 
-  // 2) 선택된 항목들만 모아서 스탯 보정 합산
+  // 2) 선택된 항목들만 모아서 스탯 보정 합산 + 출처 기록
   pickedByName.forEach(e => {
     const m = e.mod  || {};
     const p = e.modP || {};
 
-    // 고정값
-    flat.str  += +(m.str  ?? m.atk  ?? 0);
-    flat.end  += +(m.end  ?? m.def  ?? 0);
-    flat.agi  += +(m.agi  ?? m.spd  ?? 0);
-    flat.int  += +(m.int  ?? 0);
-    flat.mana += +(m.mana ?? m.hp   ?? 0);
-    flat.luck += +(m.luck ?? 0);
+    const c = {}; // 이 출처가 기여한 스탯들
 
-    // % 보정
-    pct.str   += +(p.str  ?? p.atk  ?? 0);
-    pct.end   += +(p.end  ?? p.def  ?? 0);
-    pct.agi   += +(p.agi  ?? p.spd  ?? 0);
-    pct.int   += +(p.int  ?? 0);
-    pct.mana  += +(p.mana ?? p.hp   ?? 0);
-    pct.luck  += +(p.luck ?? 0);
+    function add(key, flatVal, pctVal){
+      const f = +(flatVal || 0);
+      const pc = +(pctVal || 0);
+      if (!f && !pc) return;
+      c[key] = {flat:f, pct:pc};
+      flat[key] += f;
+      pct[key]  += pc;
+    }
+
+    add('str',  m.str  ?? m.atk,  p.str  ?? p.atk);
+    add('end',  m.end  ?? m.def,  p.end  ?? p.def);
+    add('agi',  m.agi  ?? m.spd,  p.agi  ?? p.spd);
+    add('int',  m.int,           p.int);
+    add('mana', m.mana ?? m.hp,  p.mana ?? p.hp);
+    add('luck', m.luck,          p.luck);
+
+    if (Object.keys(c).length){
+      sources.push({
+        name: e.name || '',
+        type: e.type || '',
+        rank: e.rank || '',
+        tags: e.tags || '',
+        contrib: c
+      });
+    }
   });
 
-  return {flat, pct};
+  return {flat, pct, sources};
 }
 
     function render(){
@@ -263,26 +285,61 @@ function collectSkillMods(ch){
       // Stats
       const base = ch.stats||{};
       const mods = collectSkillMods(ch);
-      const data = [
+
+      const statDefs = [
         {label:'근력', key:'str'},
         {label:'내구', key:'end'},
         {label:'민첩', key:'agi'},
         {label:'지력', key:'int'},
         {label:'마나/내력', key:'mana'},
         {label:'행운', key:'luck'}
-      ].map(({label,key:k})=>{
-        const dFlat = mods.flat[k]||0; const dPct = mods.pct[k]||0;
-        const final = (base[k]||0) + (dFlat + Math.round((base[k]||0) * (dPct/100)));
-        return {label, key:k, base: base[k]||0, delta: (dFlat + Math.round((base[k]||0) * (dPct/100))), final, grade: gradeFor(final)};
+      ];
+
+      const data = statDefs.map(({label,key:k})=>{
+        const dFlat = mods.flat[k]||0;
+        const dPct  = mods.pct[k]||0;
+        const baseVal = base[k]||0;
+        const delta = dFlat + Math.round(baseVal * (dPct/100));
+        const final = baseVal + delta;
+        return {label, key:k, base: baseVal, delta, final, grade: gradeFor(final)};
       });
+
       const maxFinal = Math.max(...data.map(d=>d.final), 1);
+
+      // 스탯별 툴팁 텍스트 생성
+      const tooltipMap = {};
+      data.forEach(d=>{
+        const related = (mods.sources || []).filter(s => s.contrib && s.contrib[d.key]);
+        if (!related.length){
+          tooltipMap[d.key] = `기본치: ${d.base}\n(이 스탯에는 현재 특성/숙련도/권능 보정이 적용되지 않습니다.)`;
+          return;
+        }
+        const lines = [];
+        lines.push(`기본치: ${d.base}`);
+        related.forEach(s=>{
+          const c = s.contrib[d.key];
+          const typeLabel = TYPE_LABELS[s.type] || s.type || '기타';
+          const rankText = s.rank ? ` [${s.rank}]` : '';
+          const parts = [];
+          if (c.flat){
+            parts.push(`${c.flat>0?'+':''}${c.flat}`);
+          }
+          if (c.pct){
+            parts.push(`${c.pct>0?'+':''}${c.pct}%`);
+          }
+          lines.push(`${typeLabel} ${s.name}${rankText}: ${parts.join(', ')}`);
+        });
+        tooltipMap[d.key] = lines.join('\n');
+      });
 
       // Render chart
       const box=$('#statsBox'); box.innerHTML='';
       if(window.chartMode==='radar'){
-        box.appendChild(renderRadar(data, maxFinal));
+        box.appendChild(renderRadar(data, maxFinal, tooltipMap));
       }else{
-        data.forEach(d=> box.appendChild( statRow(d.label, d.base, d.delta, maxFinal) ));
+        data.forEach(d=> box.appendChild(
+          statRow(d.label, d.base, d.delta, maxFinal, tooltipMap[d.key])
+        ));
       }
 
       // Skills list grouped
@@ -354,12 +411,18 @@ function collectSkillMods(ch){
 
     render();
 
-    function renderRadar(data, max){
-      const wrap=document.createElement('div'); wrap.className='radarWrap';
-      const n=data.length; const size=320; const cx=size/2, cy=size/2; const r=120;
+    function renderRadar(data, max, tooltipMap){
+      const wrap=document.createElement('div');
+      wrap.className='radarWrap';
+      const n=data.length;
+      const size=320;
+      const cx=size/2, cy=size/2;
+      const r=120;
       const svgNS='http://www.w3.org/2000/svg';
-      const holder=document.createElement('div'); holder.className='radar';
-      const svg=document.createElementNS(svgNS,'svg'); svg.setAttribute('viewBox',`0 0 ${size} ${size}`);
+      const holder=document.createElement('div');
+      holder.className='radar';
+      const svg=document.createElementNS(svgNS,'svg');
+      svg.setAttribute('viewBox',`0 0 ${size} ${size}`);
       // grid circles
       [0.25,0.5,0.75,1].forEach(p=>{ const c=document.createElementNS(svgNS,'circle'); c.setAttribute('cx',cx); c.setAttribute('cy',cy); c.setAttribute('r',r*p); c.setAttribute('fill','none'); c.setAttribute('stroke','rgba(255,255,255,.1)'); svg.appendChild(c) });
       // axes
@@ -374,6 +437,9 @@ function collectSkillMods(ch){
       data.forEach(d=>{
         const row=document.createElement('div');
         row.innerHTML=`<strong>${d.label} [${d.grade}]</strong><div style="font-size:.8rem;color:${d.delta? (d.delta>0?'#7ce085':'#f48fb1'):'#ccc'}">${d.final}${d.delta?` (${d.delta>0?'+':''}${d.delta})`:''}</div>`;
+        if (tooltipMap && tooltipMap[d.key]){
+          row.title = tooltipMap[d.key];
+        }
         lg.appendChild(row);
       });
       wrap.appendChild(lg);
