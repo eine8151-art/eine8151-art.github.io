@@ -151,13 +151,14 @@
     }
 
     .rep{
-      width: 380px !important;   /* 원하는 고정 크기, 340~420px 추천 */
+      position:absolute;
+      left: 50%;
+      bottom: 24px;          /* 바닥에서 약간 띄우기 */
+      transform: translate(-50%, 0);  /* 정확히 가운데 정렬 */
+      width: 380px;          /* 고정 폭 (원래 값 유지) */
       height: auto;
-      right: 50% !important;      /* 정확히 가운데 기준 */
-      bottom: 0;
-      transform: translateX(50%); /* 가운데 정렬 */
-      max-width: 100%;            /* 혹시라도 stage보다 커지지 않도록 */
-      pointer-events:none;        /* 마우스 효과에 방해되지 않도록 */
+      max-width: 100%;
+      pointer-events:none;
     }
 
     .rep-overlay{
@@ -257,8 +258,13 @@
       }
 
       .rep{
+        position:absolute;
+        left:50%;
+        bottom:16px;
+        transform:translate(-50%, 0);
         width:min(420px,70%);
-        right:2%
+        height:auto;
+        max-width:100%;
       }
     }
   </style>
@@ -404,36 +410,44 @@
 
 // 마우스에 따라 대표 캐릭터만 기울이기
 function handleTilt(e){
-  // 대표 이미지가 없으면 효과 꺼두기 (가끔 대표가 없는 경우 대비)
+  // 대표 이미지가 없으면 효과 끄기
   if (!repImg || repImg.style.display === 'none') return;
 
   const rect = stage.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  // 기울기 각도
-  const rotateY = -1/5 * x + 20;
-  const rotateX =  4/30 * y - 20;
+  // -1 ~ 1 사이의 비율 (가운데 기준)
+  const relX = (x - rect.width  / 2) / (rect.width  / 2);
+  const relY = (y - rect.height / 2) / (rect.height / 2);
 
-  // 빛 반사 오버레이 효과
+  // 최대 회전 각도 (원하면 숫자만 조절하면 됨)
+  const maxRotateX = 10;   // 위/아래 기울기
+  const maxRotateY = 12;   // 좌/우 기울기
+
+  const rotateY = -relX * maxRotateY;
+  const rotateX =  relY * maxRotateX;
+
+  // 빛 반사 오버레이
   if (overlay){
-    const pos = (x/5 + y/5);
-    const opacity = Math.min(0.6, x / 300); // 과도한 번쩍임 방지
-    overlay.style.backgroundPosition = pos + '%';
+    const posX = 50 + relX * 10;
+    const posY = 40 + relY * 10;
+    const opacity = Math.max(0, 0.3 - Math.abs(relX) * 0.1);
+
+    overlay.style.backgroundPosition = `${posX}% ${posY}%`;
     overlay.style.filter = `opacity(${opacity}) brightness(1.15)`;
   }
 
-  // 대표 이미지 카드만 기울이기
+  // 가운데 기준으로 살짝만 기울이기
   repImg.style.transform =
-    `translateX(50%) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    `translate(-50%, 0) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
 }
 
 function resetTilt(){
   if (!repImg || repImg.style.display === 'none') return;
 
-  // 기울기 리셋
   repImg.style.transform =
-    'translateX(50%) rotateX(0deg) rotateY(0deg)';
+    'translate(-50%, 0) rotateX(0deg) rotateY(0deg)';
 
   if (overlay){
     overlay.style.filter = 'opacity(0)';
