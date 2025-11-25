@@ -256,34 +256,77 @@
       return i<0 ? 999 : i;
     };
 
-    function collectSkillMods(ch){
-      const names = ch.skills || [];
-      const codex = loadCodex();
-      const set   = new Set(names.map(s => (s||'').toLowerCase()));
-      const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
-      const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
 
-      codex.forEach(e=>{
-        if(e.type === 'trait' && set.has((e.name||'').toLowerCase())){
-          const m = e.mod  || {};
-          const p = e.modP || {};
-          flat.str  += +(m.str  ?? m.atk  ?? 0);
-          flat.end  += +(m.end  ?? m.def  ?? 0);
-          flat.agi  += +(m.agi  ?? m.spd  ?? 0);
-          flat.int  += +(m.int  ?? 0);
-          flat.mana += +(m.mana ?? m.hp   ?? 0);
-          flat.luck += +(m.luck ?? 0);
+function collectSkillMods(ch){
+  const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']); // 특성 / 숙련도 / 권능만 항상 스탯에 반영
+  const names = ch.skills || [];
+  const codex = loadCodex();
+  const set   = new Set((names || []).map(s => (s || '').toLowerCase()));
+  const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+  const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
 
-          pct.str   += +(p.str  ?? p.atk  ?? 0);
-          pct.end   += +(p.end  ?? p.def  ?? 0);
-          pct.agi   += +(p.agi  ?? p.spd  ?? 0);
-          pct.int   += +(p.int  ?? 0);
-          pct.mana  += +(p.mana ?? p.hp   ?? 0);
-          pct.luck  += +(p.luck ?? 0);
-        }
-      });
-      return {flat, pct};
-    }
+  codex.forEach(e=>{
+    if (!ALWAYS_ON_TYPES.has(e.type)) return;
+    if (!set.has((e.name || '').toLowerCase())) return;
+
+  const m = e.mod  || {};
+  const p = e.modP || {};
+
+  flat.str  += +(m.str  ?? m.atk  ?? 0);
+  flat.end  += +(m.end  ?? m.def  ?? 0);
+  flat.agi  += +(m.agi  ?? m.spd  ?? 0);
+  flat.int  += +(m.int  ?? 0);
+  flat.mana += +(m.mana ?? m.hp   ?? 0);
+  flat.luck += +(m.luck ?? 0);
+
+  pct.str   += +(p.str  ?? p.atk  ?? 0);
+  pct.end   += +(p.end  ?? p.def  ?? 0);
+  pct.agi   += +(p.agi  ?? p.spd  ?? 0);
+  pct.int   += +(p.int  ?? 0);
+  pct.mana  += +(p.mana ?? p.hp   ?? 0);
+  pct.luck  += +(p.luck ?? 0);
+  });
+
+  return {flat, pct};
+}
+
+// 전투 시에만 쓰는 종류 (기술/마법/스킬)
+const BATTLE_ONLY_TYPES = new Set(['tech','magic','skill']);
+
+// 이번 공격에 사용할 전투 스킬 1개 선택
+function pickBattleSkill(att, kind){
+  const names = att.ch.skills || [];
+  if (!names.length) return null;
+
+  const codex = loadCodex();
+  const lowerNames = names.map(n => (n || '').toLowerCase());
+
+  const candidates = codex.filter(e => {
+    if (!BATTLE_ONLY_TYPES.has(e.type)) return false;
+    if (!lowerNames.includes((e.name || '').toLowerCase())) return false;
+    // kind(physical/magic)에 따라 필터를 더 넣고 싶으면 여기서 처리
+    return true;
+  });
+
+  if (!candidates.length) return null;
+  const chosen = candidates[randInt(0, candidates.length - 1)];
+
+  const m = chosen.mod  || {};
+  const p = chosen.modP || {};
+
+  const flat = {
+    str:  +(m.str  ?? m.atk  ?? 0),
+    int:  +(m.int  ?? 0),
+    luck: +(m.luck ?? 0),
+  };
+  const pct  = {
+    str:  +(p.str  ?? p.atk  ?? 0),
+    int:  +(p.int  ?? 0),
+    luck: +(p.luck ?? 0),
+  };
+
+  return { entry: chosen, flat, pct };
+}
 
     function calcFinalStats(ch){
       const base = ch.stats || {};
@@ -491,43 +534,68 @@
     }
 
     function doAttack(att, def){
-      // 공격 방식 결정: 근력 >= 지력 → 물리 / 반대면 마법
-      const useMagic = att.stats.mag > att.stats.atk && att.mp >= 10;
-      const kind = useMagic ? 'magic' : 'physical';
+  // 공격 방식 결정: 근력 >= 지력 → 물리 / 반대면 마법
+  const useMagic = att.stats.mag > att.stats.atk && att.mp >= 10;
+  const kind = useMagic ? 'magic' : 'physical';
 
-      const hitChance  = calcHitChance(att, def);
-      const rollHit    = Math.random()*100;
-      if(rollHit > hitChance){
-        return `${att.ch.name || '무명'}의 공격! 그러나 빗나갔다… (명중률 ${hitChance.toFixed(1)}%)`;
-      }
+  // 이번 공격에 쓸 전투용 스킬 1개 (기술/마법/스킬)
+  const battleSkill = pickBattleSkill(att, kind);
 
-      const critChance = calcCritChance(att);
-      const isCrit     = (Math.random()*100) < critChance;
+  const hitChance  = calcHitChance(att, def);
+  const rollHit    = Math.random()*100;
+  if(rollHit > hitChance){
+    return `${att.ch.name || '무명'}의 공격! 그러나 빗나갔다… (명중률 ${hitChance.toFixed(1)}%)`;
+  }
 
-      let dmgBase;
-      if(kind === 'magic'){
-        // 마법 피해: 지력 기반, 상대 지력으로 약간 감소
-        dmgBase = att.stats.mag*1.2 - def.stats.int*0.3;
-        att.mp = Math.max(0, att.mp - 10); // 간단히 마법은 MP 10 소모
-      }else{
-        // 물리 피해: 근력 기반, 상대 내구로 감소
-        dmgBase = att.stats.atk*1.1 - def.stats.end*0.4;
-      }
-      if(dmgBase < 1) dmgBase = 1;
+  const critChance = calcCritChance(att);
+  const isCrit     = (Math.random()*100) < critChance;
 
-      if(isCrit){
-        dmgBase *= 1.5;
-      }
+  // --- 공격력 계산: 기본 스탯 + (해당 스킬의 보정) ---
+  let atkBase  = useMagic ? att.stats.mag : att.stats.atk;
+  let atkFinal = atkBase;
 
-      const variance = 0.85 + Math.random()*0.3; // ±15%
-      const finalDmg = Math.max(1, Math.round(dmgBase * variance));
-      def.hp = Math.max(0, def.hp - finalDmg);
-
-      const skillName = pickSkillName(att, useMagic ? 'magic' : 'physical');
-      let line = `${att.ch.name || '무명'}가 ${skillName}을(를) 사용했다! ${finalDmg} 피해.`;
-      line += isCrit ? ` (치명타! 확률 ${critChance.toFixed(1)}%)` : '';
-      return line;
+  if (battleSkill){
+    const {flat, pct} = battleSkill;
+    if (useMagic){
+      const f = flat.int || 0;
+      const p = pct.int  || 0;
+      atkFinal = atkBase + f + Math.round(atkBase * (p/100));
+    } else {
+      const f = flat.str || 0;
+      const p = pct.str  || 0;
+      atkFinal = atkBase + f + Math.round(atkBase * (p/100));
     }
+  }
+
+  let dmgBase;
+  if(kind === 'magic'){
+    // 마법 피해: 지력 기반, 상대 지력으로 약간 감소
+    dmgBase = atkFinal*1.2 - def.stats.int*0.3;
+    att.mp = Math.max(0, att.mp - 10); // 마법은 MP 10 소모
+  }else{
+    // 물리 피해: 근력 기반, 상대 내구로 감소
+    dmgBase = atkFinal*1.1 - def.stats.end*0.4;
+  }
+  if(dmgBase < 1) dmgBase = 1;
+
+  if(isCrit){
+    dmgBase *= 1.5;
+  }
+
+  const variance = 0.85 + Math.random()*0.3; // ±15%
+  const finalDmg = Math.max(1, Math.round(dmgBase * variance));
+  def.hp = Math.max(0, def.hp - finalDmg);
+
+  // 로그에 찍힐 이름: 전투용 스킬 있으면 그 이름, 없으면 기존 로직
+  const skillName =
+    (battleSkill && battleSkill.entry && battleSkill.entry.name) ||
+    pickSkillName(att, useMagic ? 'magic' : 'physical');
+
+  let line = `${att.ch.name || '무명'}가 ${skillName}을(를) 사용했다! ${finalDmg} 피해.`;
+  line += isCrit ? ` (치명타! 확률 ${critChance.toFixed(1)}%)` : '';
+  return line;
+}
+
 
     function stepTurn(){
       const b = state.battle;
