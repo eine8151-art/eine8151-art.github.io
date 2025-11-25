@@ -92,7 +92,7 @@
 
       <div class="stat-header"><h3 style="margin:0">스탯</h3><button id="chartToggle" class="btn">방사형 보기</button></div>
       <div id="statsBox"></div>
-      <div class="small" id="statsHelp">기본치 + (특성의 ±, % 보정) = 최종치</div>
+      <div class="small" id="statsHelp">기본치 + (특성/숙련도/권능의 ±, % 보정) = 최종치</div>
 
       <h3 style="margin:16px 0 8px">스킬/특성</h3>
       <div id="skillWrap" class="skills"></div>
@@ -170,32 +170,40 @@
       return row;
     }
 
-    function collectSkillMods(ch){
-      const names = ch.skills||[];
-      const codex = loadCodex();
-      const set = new Set((names||[]).map(s=>(s||'').toLowerCase()));
-      const flat = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
-      const pct  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
-      codex.forEach(e=>{
-        if(e.type==='trait' && set.has((e.name||'').toLowerCase())){
-          const m = e.mod  || {};
-          const p = e.modP || {};
-          flat.str  += +(m.str  ?? m.atk  ?? 0);
-          flat.end  += +(m.end  ?? m.def  ?? 0);
-          flat.agi  += +(m.agi  ?? m.spd  ?? 0);
-          flat.int  += +(m.int  ?? 0);
-          flat.mana += +(m.mana ?? m.hp   ?? 0);
-          flat.luck += +(m.luck ?? 0);
-          pct.str   += +(p.str  ?? p.atk  ?? 0);
-          pct.end   += +(p.end  ?? p.def  ?? 0);
-          pct.agi   += +(p.agi  ?? p.spd  ?? 0);
-          pct.int   += +(p.int  ?? 0);
-          pct.mana  += +(p.mana ?? p.hp   ?? 0);
-          pct.luck  += +(p.luck ?? 0);
-        }
-      });
-      return {flat, pct};
-    }
+    // 특성/숙련도/권능만 항상 스탯에 반영
+const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']);
+
+function collectSkillMods(ch){
+  const names = ch.skills || [];
+  const codex = loadCodex();
+  const set   = new Set((names || []).map(s => (s || '').toLowerCase()));
+  const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+  const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+
+  codex.forEach(e=>{
+    if (!ALWAYS_ON_TYPES.has(e.type)) return;                    // ★ 종류 필터
+    if (!set.has((e.name || '').toLowerCase())) return;          // ★ 캐릭터가 가진 이름인지
+
+    const m = e.mod  || {};
+    const p = e.modP || {};
+
+    flat.str  += +(m.str  ?? m.atk  ?? 0);
+    flat.end  += +(m.end  ?? m.def  ?? 0);
+    flat.agi  += +(m.agi  ?? m.spd  ?? 0);
+    flat.int  += +(m.int  ?? 0);
+    flat.mana += +(m.mana ?? m.hp   ?? 0);
+    flat.luck += +(m.luck ?? 0);
+
+    pct.str   += +(p.str  ?? p.atk  ?? 0);
+    pct.end   += +(p.end  ?? p.def  ?? 0);
+    pct.agi   += +(p.agi  ?? p.spd  ?? 0);
+    pct.int   += +(p.int  ?? 0);
+    pct.mana  += +(p.mana ?? p.hp   ?? 0);
+    pct.luck  += +(p.luck ?? 0);
+  });
+
+  return {flat, pct};
+}
 
     function render(){
       const list = loadMembers();
