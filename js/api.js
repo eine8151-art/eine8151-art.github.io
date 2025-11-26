@@ -1,6 +1,7 @@
-// js/api.js
+// api.js
 
-// 나중에 Render로 옮기면 이 값만 바꿔주면 됨
+// ⚠ 개발 중: 로컬 서버
+// 나중에 Render에 배포하면 이 값을 "https://xxx.onrender.com" 로 바꾸면 됨
 const API_BASE = 'http://localhost:4000';
 
 function getToken() {
@@ -68,7 +69,7 @@ async function login(username, password) {
   return data.user;
 }
 
-// 로그인 유저 정보 확인용
+// 내 정보 확인용(자동 로그인 체크 등에 사용)
 async function fetchMe() {
   return apiGet('/api/me');
 }

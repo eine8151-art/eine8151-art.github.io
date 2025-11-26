@@ -365,6 +365,14 @@
 
   </div>
 
+  <!-- ✅ 새로 추가: 공통 API + 로그인 가드 -->
+  <script src="api.js"></script>
+  <script>
+    if (!getToken()) {
+      window.location.href = 'login.html';
+    }
+  </script>
+
   <script>
     // 대표 캐릭터 이미지/프로필 렌더 + 간단 효과
     const STORE='members.v1';

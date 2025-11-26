@@ -224,9 +224,6 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
         <option>기사(비기너)</option>
         <option>기사(익스퍼트)</option>
         <option>기사(마스터)</option>
-        <option>암살자</option>
-        <option>살수(殺手)</option>
-        <option>밤의 군주</option>
         <option>입마(入魔)</option>
         <option>극마(極魔)</option>
         <option>탈마(脫魔)</option>
@@ -332,6 +329,16 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
   </div>
 </div>
 
+  <!-- 1) 공통 API 로드 -->
+  <script src="api.js"></script>
+
+  <!-- 2) 토큰 없으면 로그인 페이지로 -->
+  <script>
+    if (!getToken || !getToken()) {
+      window.location.href = 'login.html';
+    }
+  </script>
+
   <script>
     /* =========================================================
     *  상수 / 레이블 / 공통 상태
@@ -416,39 +423,61 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
       return Math.random().toString(36).slice(2, 9);
     }
 
-    // localStorage → 멤버 목록 로딩 (새 키 우선, 없으면 옛 키)
-    function loadInitialMembers() {
-      try {
-        const cur = JSON.parse(localStorage.getItem(STORE) || '[]');
-        const old = JSON.parse(localStorage.getItem(STORE_OLD) || '[]');
-
-        if (Array.isArray(cur) && cur.length) {
-          S.list = cur;
-        } else if (Array.isArray(old) && old.length) {
-          S.list = old;
-          saveMembersToStorage(); // 옛 키에서 새 키로 승격
-        } else {
-          S.list = [];
-        }
-      } catch (e) {
-        console.error(e);
-        S.list = [];
-      }
+// 서버 + localStorage → 멤버 목록 로딩
+async function loadInitialMembers() {
+  // 1) 먼저 서버에서 시도
+  try {
+    const serverList = await apiGet('/api/members');
+    if (Array.isArray(serverList) && serverList.length) {
+      S.list = serverList;
+      saveMembersToLocal(); // 로컬에도 캐시
+      return;
     }
+  } catch (e) {
+    console.error('서버에서 멤버 로드 실패', e);
+  }
 
-    // 멤버 목록 저장 (새/옛 키 둘 다)
-    function saveMembersToStorage() {
-      try {
-        localStorage.setItem(STORE,     JSON.stringify(S.list));
-        localStorage.setItem(STORE_OLD, JSON.stringify(S.list));
-      } catch (e) {
-        console.error('members 저장 오류', e);
-        alert(
-          '캐릭터를 저장하는 중 오류가 발생했습니다.\n' +
-          '이미지 용량이 너무 크거나, 브라우저 저장소(LocalStorage) 용량이 가득 찼을 수 있어요.'
-        );
-      }
+  // 2) 서버에 데이터가 없거나 실패하면, 기존 localStorage 사용
+  try {
+    const cur = JSON.parse(localStorage.getItem(STORE) || '[]');
+    const old = JSON.parse(localStorage.getItem(STORE_OLD) || '[]');
+
+    if (Array.isArray(cur) && cur.length) {
+      S.list = cur;
+    } else if (Array.isArray(old) && old.length) {
+      S.list = old;
+      saveMembersToLocal(); // 옛 키 → 새 키 승격
+    } else {
+      S.list = [];
     }
+  } catch (e) {
+    console.error(e);
+    S.list = [];
+  }
+}
+
+// 서버 + 로컬 저장
+async function saveMembersToStorage() {
+  try {
+    // 1) 서버에 저장
+    await apiPost('/api/members', { members: S.list });
+  } catch (e) {
+    console.error('서버 멤버 저장 오류', e);
+  }
+
+  // 2) 서버가 실패하더라도 로컬에는 최대한 저장
+  saveMembersToLocal();
+}
+
+// 순수 localStorage 저장 전담
+function saveMembersToLocal() {
+  try {
+    localStorage.setItem(STORE,     JSON.stringify(S.list));
+    localStorage.setItem(STORE_OLD, JSON.stringify(S.list));
+  } catch (e) {
+    console.error('members 저장 오류', e);
+  }
+}
 
     /* =========================================================
     *  스킬 배열 중복 체크 (문자열/객체 혼합 대응)
@@ -581,7 +610,7 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
       S.imgData   = '';
 
       $id('fName').value = '';
-      $id('fRole').value = 'DEALER';  // 기본 직업값
+      $id('fRole').value = '없음';  // 혹은 option 중 하나의 value로
       $id('fSub').value  = '';
       $id('fNote').value = '';
 
@@ -1357,13 +1386,12 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
     *  초기 실행
     * ======================================================= */
 
-    (function init() {
-      loadInitialMembers(); // localStorage에서 멤버 목록 로딩
-      bindEvents();         // 버튼/입력 이벤트 연결
-      drawList();           // 리스트 최초 렌더
-      setViewMode('list');  // 처음에는 리스트 우선 모드
+    (async function init() {
+      await loadInitialMembers(); // ★ 서버/로컬에서 멤버 로딩 끝날 때까지 대기
+      bindEvents();               // 버튼/입력 이벤트 연결
+      drawList();                 // 리스트 최초 렌더
+      setViewMode('list');        // 처음에는 리스트 우선 모드
     })();
   </script>
 </body>
 </html>
-
