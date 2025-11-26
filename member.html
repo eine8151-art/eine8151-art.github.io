@@ -423,33 +423,35 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
       return Math.random().toString(36).slice(2, 9);
     }
 
-// 서버 + localStorage → 멤버 목록 로딩
+/// 서버 + localStorage → 멤버 목록 로딩
 async function loadInitialMembers() {
   // 1) 먼저 서버에서 시도
   try {
     const serverList = await apiGet('/api/members');
 
     if (Array.isArray(serverList)) {
-      // 1-1) 서버에 이미 데이터가 있으면 그대로 사용
-      if (serverList.length) {
+      // 1-1) 서버에 이미 데이터가 있으면 그걸 진실로 사용
+      if (serverList.length > 0) {
         S.list = serverList;
         saveMembersToLocal(); // 로컬 캐시 덮어쓰기
         return;
       }
 
-      // 1-2) 서버에는 없고, 로컬에만 있는 경우 → 최초 1회 마이그레이션
+      // 1-2) 서버는 비어 있고, 로컬에만 데이터가 있는 경우 → 최초 마이그레이션
       try {
         const cur = JSON.parse(localStorage.getItem(STORE) || '[]');
         const old = JSON.parse(localStorage.getItem(STORE_OLD) || '[]');
+
         const localList =
           (Array.isArray(cur) && cur.length) ? cur :
           (Array.isArray(old) && old.length) ? old : [];
 
-        if (localList.length) {
+        if (localList.length > 0) {
           // 로컬 데이터를 서버 + 로컬에 모두 저장
           S.list = localList;
-          await saveMembersToStorage(); // 이 안에서 서버 + local 둘 다 저장
+          await saveMembersToStorage(); // 이 안에서 서버 + 로컬 둘 다 저장
         } else {
+          // 로컬도 비어 있으면 그냥 빈 상태로 고정
           S.list = [];
           saveMembersToLocal();
         }
