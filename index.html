@@ -288,6 +288,12 @@
     <div class="sep"></div>
     <a href="member.html" class="chip link" title="단원 관리"><i class="fa-regular fa-user"></i> MEMBER</a>
     <a href="character.html" class="chip link" title="프로필"><i class="fa-regular fa-id-card"></i> PROFILE</a>
+
+    <!-- 🔚 로그아웃 버튼 -->
+    <div class="sep"></div>
+    <a href="#" class="chip link" id="logoutBtn" title="로그아웃">
+      <i class="fa-solid fa-right-from-bracket"></i> 로그아웃
+    </a>
   </div>
 
     <aside class="sidebar">
@@ -370,6 +376,24 @@
   <script>
     if (!getToken()) {
       window.location.href = 'login.html';
+    }
+
+    // 🔚 로그아웃 버튼 동작
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        // 인증 토큰 삭제
+        clearToken();
+
+        // 선택 사항: 계정 전환 시 혼동 줄이려고 일부 로컬 데이터도 정리
+        localStorage.removeItem('members.v1');
+        localStorage.removeItem('memberData.v1');
+        localStorage.removeItem('representativeId');
+
+        // 로그인 페이지로 이동
+        window.location.href = 'login.html';
+      });
     }
   </script>
 
