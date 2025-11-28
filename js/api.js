@@ -1,8 +1,7 @@
 // api.js
 
 // ⚠ 개발 중: 로컬 서버
-// 나중에 Render에 배포하면 이 값을 "https://xxx.onrender.com" 로 바꾸면 됨
-const API_BASE = 'https://text-rpg-backend.onrender.com';
+const API_BASE = "http://58.238.235.170:4000";
 
 function getToken() {
   return localStorage.getItem('authToken');
@@ -73,4 +72,3 @@ async function login(username, password) {
 async function fetchMe() {
   return apiGet('/api/me');
 }
-
