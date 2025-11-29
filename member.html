@@ -340,12 +340,6 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
   <!-- 1) 공통 API 로드 -->
   <script src="js/api.js"></script>
 
-  <!-- 2) 토큰 없으면 로그인 페이지로 -->
-  <script>
-    if (!getToken || !getToken()) {
-      window.location.href = 'login.html';
-    }
-  </script>
 
   <script>
     /* =========================================================
@@ -1431,4 +1425,5 @@ function saveMembersToLocal() {
   </script>
 </body>
 </html>
+
 
