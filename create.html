@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>캐릭터 생성</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f0f12;
+      --panel:#18181f;
+      --panel2:#121219;
+      --text:#e8e6e3;
+      --muted:#b7b3ad;
+      --gold:#d4af37;
+      --gold2:#b8922b;
+      --card:rgba(212,175,55,.35)
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:"Noto Sans KR",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:radial-gradient(circle at top,#1c1c24 0,#050509 55%,#020203 100%);
+      color:var(--text);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+    }
+    .shell{
+      width:min(980px,100%);
+      background:linear-gradient(180deg,var(--panel) 0,var(--panel2) 100%);
+      border-radius:18px;
+      border:1px solid rgba(212,175,55,.35);
+      box-shadow:0 18px 40px rgba(0,0,0,.6);
+      padding:20px;
+      display:grid;
+      grid-template-columns:320px 1fr;
+      gap:18px;
+    }
+    @media(max-width:800px){
+      .shell{grid-template-columns:1fr}
+    }
+    h1{
+      margin:0 0 6px;
+      font-family:"Cinzel",serif;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      font-size:1.3rem;
+    }
+    .sub{
+      font-size:.9rem;
+      color:var(--muted);
+      margin-bottom:16px;
+    }
+    .panel{
+      background:rgba(0,0,0,.2);
+      border-radius:14px;
+      padding:12px 14px;
+      border:1px solid rgba(255,255,255,.04);
+    }
+    .label{
+      font-size:.8rem;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      margin-bottom:6px;
+    }
+    .gender-wrap{
+      display:flex;
+      gap:8px;
+    }
+    .gbtn{
+      flex:1;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.04);
+      font-size:.9rem;
+      cursor:pointer;
+      text-align:center;
+      transition:.15s all;
+    }
+    .gbtn.active{
+      border-color:var(--gold);
+      background:rgba(212,175,55,.18);
+      box-shadow:0 0 0 1px rgba(212,175,55,.25);
+    }
+    .avatar-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(90px,1fr));
+      gap:8px;
+      max-height:260px;
+      overflow:auto;
+    }
+    .avatar-card{
+      position:relative;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.15);
+      background:rgba(0,0,0,.35);
+      padding:4px;
+      cursor:pointer;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      font-size:.8rem;
+      text-align:center;
+    }
+    .avatar-card img{
+      width:100%;
+      aspect-ratio:3/4;
+      border-radius:10px;
+      object-fit:cover;
+    }
+    .avatar-card span{
+      color:var(--muted);
+    }
+    .avatar-card.active{
+      border-color:var(--gold);
+      box-shadow:0 0 0 1px rgba(212,175,55,.45);
+      background:rgba(212,175,55,.12);
+    }
+    .preview{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
+    }
+    .preview-box{
+      width:180px;
+      height:220px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.2);
+      background:radial-gradient(circle at top,#2a2330 0,#0c0c12 60%,#050509 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .preview-box img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+    }
+    .stats{
+      margin-top:8px;
+      width:100%;
+      border-collapse:collapse;
+      font-size:.9rem;
+    }
+    .stats th,
+    .stats td{
+      padding:3px 4px;
+    }
+    .stats th{
+      text-align:left;
+      color:var(--muted);
+      font-weight:400;
+      width:60px;
+    }
+    .stats td{
+      text-align:right;
+      font-variant-numeric:tabular-nums;
+    }
+    .pill{
+      display:inline-flex;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.2);
+      margin:2px;
+      font-size:.78rem;
+      color:var(--muted);
+      background:rgba(0,0,0,.35);
+    }
+    .btn{
+      padding:9px 14px;
+      border-radius:999px;
+      border:1px solid rgba(212,175,55,.7);
+      background:linear-gradient(120deg,var(--gold) 0,var(--gold2) 100%);
+      color:#181818;
+      font-weight:600;
+      cursor:pointer;
+      font-size:.9rem;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-width:130px;
+    }
+    .btn.secondary{
+      background:transparent;
+      color:var(--text);
+      border-color:rgba(255,255,255,.3);
+    }
+    .btn[disabled]{
+      opacity:.6;
+      cursor:default;
+    }
+    .btn-row{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-top:14px;
+    }
+    .small{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- 왼쪽: 성별 / 외모 선택 -->
+    <div class="panel">
+      <h1>Character Creation</h1>
+      <div class="sub">최초 접속 시 1명의 모험가가 생성됩니다. 성별과 외모를 선택해주세요.</div>
+
+      <div>
+        <div class="label">성별</div>
+        <div class="gender-wrap">
+          <button type="button" class="gbtn" id="gMale">남성</button>
+          <button type="button" class="gbtn" id="gFemale">여성</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="label">외모(이미지 업로드)</div>
+        <input id="avatarFile" type="file" accept="image/*">
+        <div class="small" style="margin-top:6px;">
+          ※ JPG/PNG 이미지를 업로드하면 캐릭터 초상화로 저장됩니다. (서버에 함께 저장됨)
+        </div>
+      </div>
+    </div>  <!-- ← 왼쪽 panel 닫기 추가 -->
+
+    <!-- 오른쪽: 프리뷰 / 랜덤 능력치 / 특성 -->
+    <div class="panel">
+      <div class="preview">
+        <div class="label" style="width:100%;">프리뷰</div>
+        <div class="preview-box">
+          <img id="previewImg" src="" alt="preview">
+        </div>
+        <div class="small" id="previewName"></div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="label">기본 능력치 (랜덤)</div>
+        <table class="stats">
+          <tbody>
+            <tr><th>근력</th><td id="stStr"></td></tr>
+            <tr><th>내구</th><td id="stEnd"></td></tr>
+            <tr><th>민첩</th><td id="stAgi"></td></tr>
+            <tr><th>지력</th><td id="stInt"></td></tr>
+            <tr><th>마나</th><td id="stMana"></td></tr>
+            <tr><th>행운</th><td id="stLuck"></td></tr>
+          </tbody>
+        </table>
+        <div class="btn-row">
+          <button type="button" class="btn secondary" id="rerollStatsBtn">능력치 다시 굴리기</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="label">초기 특성 (랜덤 부여)</div>
+        <div id="traitWrap"></div>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn secondary" onclick="location.href='member.html'">돌아가기</button>
+        <button type="button" class="btn" id="createBtn">
+          <span>이 설정으로 생성</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 공통 API -->
+  <script src="js/api.js"></script>
+  <script>
+    // 토큰 없으면 로그인 페이지로
+    if (!getToken || !getToken()) {
+      window.location.href = 'login.html';
+    }
+  </script>
+
+  <script>
+    const $id = id => document.getElementById(id);
+
+    // 간단한 uid 생성
+    function uid() {
+      return Math.random().toString(36).slice(2, 9);
+    }
+
+    // 랜덤 정수
+    function rint(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // 상태
+    const STATE = {
+      gender: 'male',      // 'male' | 'female'
+      imgData: '',         // 업로드한 이미지 DataURL
+      stats: null,
+      traits: []
+    };
+
+    // 계정별 최대 캐릭터 슬롯 (업적 기반)
+    // 기본 1명 + '첫 걸음' 업적 해금 시 +1
+    let MAX_MEMBER_SLOTS = 1;
+
+    async function refreshMaxSlots() {
+      MAX_MEMBER_SLOTS = 1;
+      try {
+        const achievements = await apiGet('/api/achievements');
+        if (Array.isArray(achievements)) {
+          const firstStep = achievements.find(a => a.code === 'first_step' && a.unlocked);
+          if (firstStep) {
+            MAX_MEMBER_SLOTS += 1;
+          }
+        }
+      } catch (e) {
+        console.warn('업적 정보를 불러오지 못했습니다. 기본 1 슬롯만 사용합니다.', e);
+      }
+    }
+
+    // 현재 보유 중인 캐릭터 수로 캐릭터를 더 만들 수 있는지 여부
+    function canCreateMoreCharacters(currentCount) {
+      return currentCount < MAX_MEMBER_SLOTS;
+    }
+
+    // ★ 최초 캐릭터 생성 시 특성 1회만 사용하도록 캐시 키
+    const CREATE_TRAIT_CACHE_KEY = 'firstCreateTraits.v1';
+
+    // 캐시에 저장된 최초 특성 불러오기
+    function loadInitialTraitsFromCache() {
+      try {
+        const raw = localStorage.getItem(CREATE_TRAIT_CACHE_KEY);
+        if (!raw) return null;
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : null;
+      } catch (e) {
+        console.error('초기 특성 캐시 로드 실패', e);
+        return null;
+      }
+    }
+
+    // 현재 STATE.traits를 캐시에 저장
+    function saveInitialTraitsToCache() {
+      try {
+        localStorage.setItem(
+          CREATE_TRAIT_CACHE_KEY,
+          JSON.stringify(STATE.traits || [])
+        );
+      } catch (e) {
+        console.error('초기 특성 캐시 저장 실패', e);
+      }
+    }
+
+    // 캐시 제거 (캐릭터 생성이 끝난 뒤 사용)
+    function clearInitialTraitsCache() {
+      try {
+        localStorage.removeItem(CREATE_TRAIT_CACHE_KEY);
+      } catch (e) {
+        console.error('초기 특성 캐시 삭제 실패', e);
+      }
+    }
+
+    // 랜덤 능력치 생성 (1~12, 중앙값 근처가 잘 나오도록)
+    function rollStats() {
+      STATE.stats = {
+        str:  rollWeightedStat(),
+        end:  rollWeightedStat(),
+        agi:  rollWeightedStat(),
+        int:  rollWeightedStat(),
+        mana: rollWeightedStat(),
+        luck: rollWeightedStat()
+      };
+      renderStats();
+    }
+
+    // 1~12 범위에서 중앙(4~6)일수록 잘 나오는 가중치 랜덤
+    const STAT_VALUES  = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    // 인덱스 0~11에 대한 가중치 (원하는 대로 조정 가능)
+    const STAT_WEIGHTS = [1, 2, 3, 5, 7, 7, 5, 3, 2, 1, 1, 1];
+    // -> 4~6이 가장 잘 나오고, 그 주변이 점점 희귀해짐
+
+    const STAT_WEIGHT_SUM = STAT_WEIGHTS.reduce((a, b) => a + b, 0);
+
+    function rollWeightedStat() {
+      let r = Math.random() * STAT_WEIGHT_SUM;
+      for (let i = 0; i < STAT_VALUES.length; i++) {
+        r -= STAT_WEIGHTS[i];
+        if (r <= 0) {
+          return STAT_VALUES[i];
+        }
+      }
+      // 혹시 루프를 다 돌아도 안 걸렸을 때 대비
+      return STAT_VALUES[STAT_VALUES.length - 1];
+    }
+
+    function renderStats() {
+      if (!STATE.stats) return;
+      $id('stStr').textContent  = STATE.stats.str;
+      $id('stEnd').textContent  = STATE.stats.end;
+      $id('stAgi').textContent  = STATE.stats.agi;
+      $id('stInt').textContent  = STATE.stats.int;
+      $id('stMana').textContent = STATE.stats.mana;
+      $id('stLuck').textContent = STATE.stats.luck;
+    }
+
+// ==== 도감(codex) 연동 ====
+
+// 도감 localStorage 키
+const CODEX_KEY = 'codex.v1';
+
+// 도감 등급 순서 (member/character 쪽과 통일)
+const RANK_ORDER = [
+  'EX','SSS','SS','S+','S',
+  'A++','A+','A','A-',
+  'B++','B+','B','B-',
+  'C++','C+','C','C-',
+  'D++','D+','D','D-',
+  'F++','F+','F','F-'
+];
+
+function rankIndex(r) {
+  const i = RANK_ORDER.indexOf(r || '');
+  return i === -1 ? 999 : i;
+}
+
+// localStorage에서 도감 로드
+function loadCodex() {
+  try {
+    const raw = localStorage.getItem(CODEX_KEY) || '[]';
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    console.error('codex 로드 실패', e);
+    return [];
+  }
+}
+
+// F~S 등급 범위만 허용 (EX / SSS / SS 제외)
+const RANDOM_TRAIT_RANKS = new Set([
+  'F-','F','F+','F++',
+  'D-','D','D+','D++',
+  'C-','C','C+','C++',
+  'B-','B','B+','B++',
+  'A-','A','A+','A++',
+  'S','S+'
+]);
+
+// ★ 특성 획득 조건 검사
+function traitMeetsCondition(item, context = {}) {
+  if (!item) return false;
+
+  const job  = (context.job  || '').trim();
+  const race = (context.race || '').trim();
+
+  const jobs  = Array.isArray(item.condJobs)  ? item.condJobs  : (item.condJobs  || '').split(/\s*,\s*/);
+  const races = Array.isArray(item.condRaces) ? item.condRaces : (item.condRaces || '').split(/\s*,\s*/);
+
+  const norm = arr => arr
+    .map(s => (s || '').toString().trim())
+    .filter(Boolean);
+
+  const jobList  = norm(jobs);
+  const raceList = norm(races);
+
+  // 직업 조건이 없으면 아무 직업이나 OK, 있으면 그 안에 포함되어야 OK
+  const jobOk =
+    jobList.length === 0 ||
+    (job && jobList.includes(job));
+
+  // 종족 조건도 같은 방식
+  const raceOk =
+    raceList.length === 0 ||
+    (race && raceList.includes(race));
+
+  return jobOk && raceOk;
+}
+
+// ★ context를 받아서 조건을 고려한 랜덤 특성 선택
+function pickRandomTraitFromCodex(context = {}) {
+  const codex = loadCodex();
+
+  const pool = codex.filter(x => {
+    if (!x) return false;
+    if (x.type !== 'trait') return false;
+    if (!RANDOM_TRAIT_RANKS.has(x.rank)) return false;
+
+    // randomCandidate가 false면 랜덤 풀에서 제외
+    const rc = (x.randomCandidate !== false);
+
+    return rc && traitMeetsCondition(x, context);
+  });
+
+  if (!pool.length) {
+    return null;
+  }
+  const t = pool[Math.floor(Math.random() * pool.length)];
+  return {
+    name:    t.name || '',
+    rank:    t.rank || null,
+    type:    t.type || 'trait',
+    codexId: t.id   || null
+  };
+}
+
+// 랜덤 특성 – 도감 기반
+function rollTraits() {
+  // ★ TODO: 나중에 실제 직업/종족 선택 값을 여기로 넘기면 됨
+  const context = {
+    job:  '무직', // 아직 직업 시스템 초기이므로 기본값
+    race: '인간'  // 나중에 종족 필드 생기면 교체
+  };
+
+  const trait = pickRandomTraitFromCodex(context);
+  if (!trait) {
+    STATE.traits = [];
+  } else {
+    STATE.traits = [trait];   // 기본 1개
+  }
+  renderTraits();
+}
+
+function renderTraits() {
+  const wrap = $id('traitWrap');
+  wrap.innerHTML = '';
+  if (!STATE.traits.length) {
+    wrap.innerHTML = '<span class="small">(특성 없음)</span>';
+    return;
+  }
+  STATE.traits.forEach(t => {
+    const span = document.createElement('span');
+    span.className = 'pill';
+    span.textContent = t.rank ? `${t.name} [${t.rank}]` : t.name;
+    wrap.appendChild(span);
+  });
+}
+
+    function setGender(g) {
+      STATE.gender = g;
+      const gm = $id('gMale');
+      const gf = $id('gFemale');
+      gm.classList.toggle('active', g === 'male');
+      gf.classList.toggle('active', g === 'female');
+      // 성별 바꾸면 이름 프리뷰만 다시
+      updatePreview();
+    }
+
+    // 간단한 랜덤 이름 생성
+    const NAME_PARTS_M = ['아르','레온','카일','란','데인','하츠','벨','로드','카스','엘'];
+    const NAME_PARTS_F = ['리아','엘라','세라','루나','이리스','카렌','샤를','네라','벨라','유나'];
+
+    function generateRandomName() {
+      const parts = STATE.gender === 'male' ? NAME_PARTS_M : NAME_PARTS_F;
+      const a = parts[rint(0, parts.length - 1)];
+      const b = parts[rint(0, parts.length - 1)];
+      return a + b;
+    }
+
+    function updatePreview() {
+      const imgEl = $id('previewImg');
+
+      // 업로드된 이미지가 있으면 그걸, 없으면 플레이스홀더
+      imgEl.src = STATE.imgData || 'https://via.placeholder.com/300x200/2a2a2a/888?text=NO+IMAGE';
+
+      const name = generateRandomName();
+      $id('previewName').textContent = `임시 이름 예시: ${name}`;
+    }
+
+    // 캐릭터 생성
+    async function createCharacter() {
+      const btn = $id('createBtn');
+      btn.disabled = true;
+
+      try {
+        // 이미 캐릭터가 존재하는지 한 번 더 확인 (보안용)
+        await refreshMaxSlots();
+        const existing = await apiGet('/api/members');
+        const currentCount = Array.isArray(existing) ? existing.length : 0;
+
+        if (!canCreateMoreCharacters(currentCount)) {
+          alert('현재 계정에서 생성 가능한 캐릭터 수를 모두 사용했습니다.');
+          window.location.href = 'member.html';
+          return;
+        }
+
+        if (!STATE.stats) rollStats();
+        if (!STATE.traits.length) rollTraits();
+
+        const newChar = {
+          id: uid(),
+          name: generateRandomName(),
+          // ★ 첫 직업: 무직
+          role: '무직',
+          // ★ 직업 시스템용 내부 id
+          jobId: 'job_none',
+          sub: '',
+          note: '',
+          gender: STATE.gender,
+          img: STATE.imgData || '',
+          stats: STATE.stats,
+          equip: {
+            glove: '',
+            pants: '',
+            shirt: '',
+            boots: '',
+            weapon: ''
+          },
+          // 특성은 배열 그대로 skills에 넣어 둠 (나중에 도감 구조와 통일 예정)
+          skills: [...STATE.traits],
+          timeline: []
+        };
+
+        // 서버에 멤버 목록 전체로 저장
+        // → 기존 멤버 + 새 캐릭터를 모두 보내야 함
+        const nextMembers = Array.isArray(existing) ? [...existing, newChar] : [newChar];
+        await apiPost('/api/members', { members: nextMembers });
+
+        // ★ 최초 특성 캐시 정리
+        clearInitialTraitsCache();
+
+        alert('캐릭터가 생성되었습니다.');
+        window.location.href = 'member.html';
+      } catch (e) {
+        console.error(e);
+        alert('캐릭터 생성 중 오류가 발생했습니다.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // 초기화
+    (async function init() {
+      try {
+        // 업적 기반 슬롯 정보 먼저 반영
+        await refreshMaxSlots();
+
+        // 이미 캐릭터가 있고, 슬롯이 꽉 찼으면 create 페이지 진입 차단
+        const existing = await apiGet('/api/members');
+        const currentCount = Array.isArray(existing) ? existing.length : 0;
+
+        if (!canCreateMoreCharacters(currentCount)) {
+          window.location.href = 'member.html';
+          return;
+        }
+      } catch (e) {
+        console.error('멤버/업적 확인 실패 (처음 생성일 가능성)', e);
+      }
+
+      // 기본 성별: 남성
+      setGender('male');
+      rollTraits();
+      updatePreview();
+      rollStats();   // 능력치는 계속 리롤 가능
+
+      // ★ 특성: 최초 1회만 랜덤
+      const cached = loadInitialTraitsFromCache();
+      if (cached && cached.length) {
+        // 이전에 이미 한 번 뽑힌 특성이 있으면 그대로 사용
+        STATE.traits = cached;
+        renderTraits();
+      } else {
+        // 캐시가 없을 때 딱 한 번만 굴리고 캐시에 저장
+        rollTraits();            // 이 안에서 STATE.traits 세팅 + renderTraits() 호출
+        saveInitialTraitsToCache();
+      }
+
+      // 이벤트 바인딩
+      $id('gMale').onclick   = () => { setGender('male');   updatePreview(); };
+      $id('gFemale').onclick = () => { setGender('female'); updatePreview(); };
+      $id('rerollStatsBtn').onclick = () => rollStats();
+      $id('createBtn').onclick      = () => createCharacter();
+
+      // 초기 프리뷰 갱신
+      updatePreview();
+    })();
+
+    // 이미지 업로드 (용량 축소 후 DataURL 저장)
+    const avatarFileInput = $id('avatarFile');
+    const previewImg = $id('previewImg');
+
+    if (avatarFileInput) {
+      avatarFileInput.onchange = e => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+          const maxSize = 512;
+          const scale = Math.min(
+            maxSize / img.width,
+            maxSize / img.height,
+            1
+          );
+
+          const canvas = document.createElement('canvas');
+          canvas.width  = Math.round(img.width  * scale);
+          canvas.height = Math.round(img.height * scale);
+
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          // JPEG로 인코딩해서 용량 줄이기
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+          STATE.imgData   = dataUrl;    // 상태에 저장
+          previewImg.src  = dataUrl;    // 프리뷰 반영
+
+          URL.revokeObjectURL(url);
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          alert('이미지를 불러오는 데 실패했습니다.');
+        };
+
+        img.src = url;
+      };
+    }
+  </script>
+</body>
+</html>

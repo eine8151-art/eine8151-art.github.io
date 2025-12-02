@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WORLD – 세계 지도</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- ✅ 공통 위치 데이터 로드 -->
+  <script src="js/world-data.js"></script>
+
+  <style>
+    :root{
+      --bg:#0f0f12;
+      --panel:#18181f;
+      --panel2:#121219;
+      --text:#e8e6e3;
+      --muted:#b7b3ad;
+      --gold:#d4af37;
+      --gold2:#b8922b;
+      --card:rgba(212,175,55,.2);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:'Noto Sans KR',system-ui,sans-serif;
+      background:radial-gradient(1200px 800px at 65% -10%, rgba(212,175,55,.22), transparent 60%),
+                 radial-gradient(900px 600px at -10% 100%, rgba(93,188,210,.32), transparent 55%),
+                 #050509;
+      color:var(--text);
+      overflow:hidden;
+    }
+
+    .app{
+      position:relative;
+      display:grid;
+      grid-template-rows:auto 1fr auto;
+      height:100vh;
+      padding:16px;
+      gap:16px;
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .top-left{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    .logo-chip{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(0,0,0,.4);
+      border:1px solid rgba(255,255,255,.06);
+      font-size:.85rem;
+    }
+    .logo-chip i{color:var(--gold);}
+
+    .top-title{
+      display:flex;
+      flex-direction:column;
+    }
+    .top-title h1{
+      font-family:'Cinzel',serif;
+      font-size:1.1rem;
+      margin:0;
+      letter-spacing:.08em;
+    }
+    .top-title span{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+
+    .top-right{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+
+    .chip{
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.06);
+      background:rgba(0,0,0,.35);
+      font-size:.8rem;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      color:var(--muted);
+    }
+    .chip strong{color:var(--text);}
+
+    .chip.link{
+      cursor:pointer;
+      text-decoration:none;
+    }
+    .chip.link:hover{
+      background:rgba(212,175,55,.15);
+      border-color:rgba(212,175,55,.6);
+      color:var(--gold);
+    }
+
+    .main{
+      display:grid;
+      grid-template-columns:2.1fr 1.2fr;
+      gap:16px;
+      min-height:0;
+    }
+
+    .panel{
+      border-radius:18px;
+      background:linear-gradient(180deg, rgba(18,18,24,.9), rgba(10,10,16,.95));
+      border:1px solid rgba(255,255,255,.06);
+      box-shadow:0 18px 40px rgba(0,0,0,.55);
+      padding:14px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .panel-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:8px;
+    }
+
+    .panel-header h2{
+      margin:0;
+      font-size:.95rem;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    .panel-header small{
+      font-size:.75rem;
+      color:var(--muted);
+    }
+
+    /* 🌍 월드 맵 영역 */
+    .world-map-wrap{
+      position:relative;
+      width:100%;
+      height:100%;
+      border-radius:14px;
+      overflow:hidden;
+      background:#05060a;
+      border:1px solid rgba(255,255,255,.06);
+    }
+
+    .world-map{
+      position:relative;
+      width:100%;
+      height:100%;
+    }
+
+    .world-map img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      filter:saturate(1.1) contrast(1.05);
+    }
+
+    /* 🔻 캐릭터 목록 오버레이 */
+    .char-overlay{
+      position:absolute;
+      left:10px;
+      right:10px;
+      bottom:10px;
+      display:flex;
+      justify-content:flex-start;
+      pointer-events:none;
+    }
+
+    .char-list{
+      display:flex;
+      gap:6px;
+      padding:6px 8px;
+      border-radius:999px;
+      background:rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.12);
+      backdrop-filter:blur(10px);
+      max-width:100%;
+      overflow-x:auto;
+      pointer-events:auto;
+    }
+
+    .char-item{
+      border:none;
+      background:transparent;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      padding:3px 7px;
+      border-radius:999px;
+      cursor:pointer;
+      color:var(--muted);
+      font-size:.75rem;
+      white-space:nowrap;
+      transition:.16s;
+    }
+
+    .char-item img{
+      width:22px;
+      height:22px;
+      border-radius:999px;
+      object-fit:cover;
+      border:1px solid rgba(255,255,255,.4);
+    }
+
+    .char-item .tag{
+      font-size:.7rem;
+      opacity:.8;
+    }
+
+    .char-item .rep-badge{
+      font-size:.65rem;
+      padding:1px 4px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.3);
+      background:rgba(0,0,0,.6);
+      color:var(--gold2);
+    }
+
+    .char-item.active{
+      background:linear-gradient(135deg,var(--gold),var(--gold2));
+      color:#111;
+    }
+
+    .char-item.active img{
+      border-color:rgba(0,0,0,.6);
+    }
+
+    .char-empty{
+      font-size:.75rem;
+      color:var(--muted);
+      padding:2px 4px;
+    }
+
+    /* 🔻 지도 위 캐릭터 위치 마커 */
+    .char-marker{
+      position:absolute;
+      transform:translate(-50%, -50%);
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      background:rgba(212,175,55,.7);
+      box-shadow:0 0 0 2px rgba(0,0,0,.7);
+      pointer-events:none;
+      opacity:.85;
+    }
+
+    .char-marker.current{
+      width:12px;
+      height:12px;
+      box-shadow:0 0 14px rgba(212,175,55,.9);
+    }
+
+    .char-marker.flash{
+      animation:charPing .4s ease-out;
+    }
+
+    @keyframes charPing{
+      from{
+        transform:translate(-50%, -50%) scale(0.8);
+        opacity:.3;
+      }
+      to{
+        transform:translate(-50%, -50%) scale(1.2);
+        opacity:1;
+      }
+    }
+
+    .country-pin{
+      position:absolute;
+      transform:translate(-50%, -50%);
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.35);
+      background:rgba(5,5,10,.6);
+      color:var(--text);
+      font-size:.75rem;
+      white-space:nowrap;
+      backdrop-filter:blur(4px);
+      cursor:pointer;
+      transition:.18s ease;
+    }
+    .country-pin:hover{
+      background:var(--card);
+      border-color:var(--gold);
+      transform:translate(-50%, -50%) translateY(-2px);
+    }
+    .country-pin.active{
+      background:linear-gradient(135deg,var(--gold),var(--gold2));
+      color:#111;
+      border-color:rgba(0,0,0,.5);
+    }
+    .country-pin.pin-flash{
+      animation:charPing .4s ease-out;
+    }
+
+    /* 🏰 나라 정보 패널 */
+    .country-info{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      font-size:.85rem;
+    }
+
+    .country-name{
+      font-size:1rem;
+      font-weight:600;
+    }
+
+    .badge-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:4px;
+    }
+
+    .badge{
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:.7rem;
+      border:1px solid rgba(255,255,255,.06);
+      background:rgba(0,0,0,.4);
+      color:var(--muted);
+    }
+
+    .country-desc{
+      margin-top:4px;
+      color:var(--muted);
+      line-height:1.5;
+      white-space:pre-line;
+    }
+
+    .country-meta{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:6px;
+      margin-top:8px;
+      font-size:.78rem;
+      color:var(--muted);
+    }
+
+    .meta-item{
+      padding:6px 8px;
+      border-radius:10px;
+      background:rgba(0,0,0,.45);
+      border:1px solid rgba(255,255,255,.04);
+    }
+
+    .meta-label{
+      font-size:.7rem;
+      color:rgba(183,179,173,.9);
+    }
+
+    .meta-value{
+      font-size:.8rem;
+    }
+
+    .manage-actions{
+      margin-top:10px;
+      display:flex;
+      gap:8px;
+    }
+
+    .btn{
+      flex:1;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(0,0,0,.7);
+      color:var(--text);
+      font-size:.8rem;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+    .btn.primary{
+      background:linear-gradient(135deg,var(--gold),var(--gold2));
+      color:#111;
+      border-color:rgba(0,0,0,.6);
+    }
+    .btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 12px 24px rgba(0,0,0,.4);
+    }
+
+    /* 하단 네비 */
+    .bottomnav{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:center;
+      padding:10px 12px;
+      background:linear-gradient(180deg, rgba(26,26,32,.9), rgba(10,10,16,.95));
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.06);
+      backdrop-filter:blur(12px);
+    }
+
+    .navbtn{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:3px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      font-size:.7rem;
+      cursor:pointer;
+      min-width:62px;
+      transition:.18s ease;
+    }
+    .navbtn i{font-size:.9rem;}
+    .navbtn:hover{
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+    }
+    .navbtn.active{
+      background:linear-gradient(135deg,var(--gold),var(--gold2));
+      color:#111;
+    }
+
+    @media(max-width:900px){
+      .app{
+        padding:10px;
+        gap:10px;
+      }
+      .main{
+        grid-template-columns:1fr;
+        grid-template-rows:1.3fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- 상단 바 -->
+    <header class="topbar">
+      <div class="top-left">
+        <div class="logo-chip">
+          <i class="fa-solid fa-earth-asia"></i>
+          <span style="font-size:.8rem;">WORLD MAP</span>
+        </div>
+        <div class="top-title">
+          <h1>세계 지도</h1>
+          <span>나라를 선택해 관리 페이지로 이동합니다.</span>
+        </div>
+      </div>
+      <div class="top-right">
+        <a href="index.html" class="chip link">
+          <i class="fa-solid fa-house"></i> 홈으로
+        </a>
+      </div>
+    </header>
+
+    <!-- 메인 영역 -->
+    <main class="main">
+      <!-- 🌍 지도 패널 -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>WORLD MAP</h2>
+          <small id="worldNameLabel">기본 월드</small>
+        </div>
+        <div class="world-map-wrap">
+          <div class="world-map" id="worldMap">
+            <img src="images/world-map.png" alt="세계 지도">
+
+            <!-- 캐릭터 목록 오버레이 -->
+            <div class="char-overlay">
+              <div class="char-list" id="charList"></div>
+            </div>
+
+            <!-- 나라 핀(버튼)들이 JS로 여기에 추가됨 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 🏰 나라 정보 패널 -->
+      <aside class="panel">
+        <div class="panel-header">
+          <h2>COUNTRY</h2>
+          <small id="countryIdLabel">나라를 선택하세요</small>
+        </div>
+
+        <div class="country-info">
+          <div class="country-name" id="countryName">선택된 나라 없음</div>
+          <div class="badge-row" id="countryBadges"></div>
+          <div class="country-desc" id="countryDesc">
+            왼쪽 세계 지도에서 나라 이름이 있는 구역을 클릭하면,
+            여기에 해당 국가의 상세 정보가 나타납니다.
+          </div>
+
+          <div class="country-meta">
+            <div class="meta-item">
+              <div class="meta-label">지역</div>
+              <div class="meta-value" id="countryRegion">-</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">중심 세력</div>
+              <div class="meta-value" id="countryFaction">-</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">추천 레벨</div>
+              <div class="meta-value" id="countryLevel">-</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">비고</div>
+              <div class="meta-value" id="countryNote">-</div>
+            </div>
+          </div>
+          <div class="manage-actions">
+            <button class="btn primary" id="openManageBtn">
+              <i class="fa-solid fa-pen-to-square"></i>
+              나라 관리 페이지 열기
+            </button>
+            <button class="btn" id="centerOnMapBtn">
+              <i class="fa-regular fa-compass"></i>
+              지도에서 중앙으로
+            </button>
+          </div>
+        </div>
+      </aside>
+    </main>
+    
+    <!-- 하단 네비게이션 -->
+    <nav class="bottomnav">
+      <button class="navbtn active" onclick="location.href='world.html'">
+        <i class="fa-solid fa-earth-asia"></i><span>WORLD</span>
+      </button>
+      <button class="navbtn" onclick="location.href='member.html'">
+        <i class="fa-regular fa-user"></i><span>MEMBER</span>
+      </button>
+      <button class="navbtn" onclick="location.href='character.html'">
+        <i class="fa-regular fa-id-card"></i><span>PROFILE</span>
+      </button>
+      <button class="navbtn" onclick="location.href='compendium.html'">
+        <i class="fa-regular fa-bookmark"></i><span>도감</span>
+      </button>
+      <button class="navbtn" onclick="location.href='battle.html'">
+        <i class="fa-solid fa-swords"></i><span>BATTLE</span>
+      </button>
+      <button class="navbtn" onclick="location.href='equipment.html'">
+        <i class="fa-solid fa-shield-halved"></i><span>EQUIP</span>
+      </button>
+      <button class="navbtn" onclick="location.href='inventory.html'">
+        <i class="fa-solid fa-box-open"></i><span>INVENTORY</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- api.js 사용 -->
+  <script src="api.js"></script>
+  <script>
+    // 📌 지금은 프론트 상수로만 정의해두고,
+    // 나중에 /api/worlds/world_default 를 불러오는 식으로 교체하면 됨.
+    const WORLD_ID = 'world_default';
+
+    const worldMapEl       = document.getElementById('worldMap');
+    const countryNameEl    = document.getElementById('countryName');
+    const countryIdLabelEl = document.getElementById('countryIdLabel');
+    const countryDescEl    = document.getElementById('countryDesc');
+    const countryRegionEl  = document.getElementById('countryRegion');
+    const countryFactionEl = document.getElementById('countryFaction');
+    const countryLevelEl   = document.getElementById('countryLevel');
+    const countryNoteEl    = document.getElementById('countryNote');
+    const countryBadgesEl  = document.getElementById('countryBadges');
+    const openManageBtn    = document.getElementById('openManageBtn');
+    const centerOnMapBtn   = document.getElementById('centerOnMapBtn');
+    const charListEl       = document.getElementById('charList');
+
+    let selectedCountry = null;
+    let pins = [];
+
+    function renderPins() {
+      pins.forEach(p => p.remove());
+      pins = [];
+
+      (COUNTRIES || []).forEach(country => {
+        const btn = document.createElement('button');
+        btn.className = 'country-pin';
+        btn.style.left = country.x + '%';
+        btn.style.top  = country.y + '%';
+        btn.textContent = country.name;
+        btn.dataset.id = country.id;
+
+        btn.addEventListener('click', () => {
+          selectCountry(country.id);
+        });
+
+        worldMapEl.appendChild(btn);
+        pins.push(btn);
+      });
+    }
+
+    function selectCountry(countryId) {
+      const country = (COUNTRIES || []).find(c => c.id === countryId);
+      if (!country) return;
+
+      selectedCountry = country;
+
+      // 버튼 active 표시
+      pins.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.id === country.id);
+      });
+
+      // 정보 패널 업데이트 (나머지는 기존 그대로)
+      countryNameEl.textContent    = country.name;
+      countryIdLabelEl.textContent = country.id;
+      countryRegionEl.textContent  = country.region  || '-';
+      countryFactionEl.textContent = country.faction || '-';
+      countryLevelEl.textContent   = country.level   || '-';
+      countryNoteEl.textContent    = country.note    || '-';
+      countryDescEl.textContent    = country.desc    || '';
+
+      // 뱃지
+      countryBadgesEl.innerHTML = '';
+      (country.badges || []).forEach(text => {
+        const span = document.createElement('span');
+        span.className = 'badge';
+        span.textContent = text;
+        countryBadgesEl.appendChild(span);
+      });
+    }
+
+    // 나라 관리 페이지로 이동
+    openManageBtn.addEventListener('click', () => {
+      if (!selectedCountry) {
+        alert('먼저 지도의 나라를 하나 선택해 주세요.');
+        return;
+      }
+      location.href = 'country.html?id=' + encodeURIComponent(selectedCountry.id);
+    });
+
+    // 지도에서 해당 나라 강조
+    centerOnMapBtn.addEventListener('click', () => {
+      if (!selectedCountry) {
+        alert('먼저 지도의 나라를 하나 선택해 주세요.');
+        return;
+      }
+      const pin = pins.find(p => p.dataset.id === selectedCountry.id);
+      if (pin) {
+        pin.style.transition = 'transform 0.18s ease, box-shadow 0.18s ease';
+        pin.style.boxShadow = '0 0 20px rgba(212,175,55,.8)';
+        setTimeout(() => {
+          pin.style.boxShadow = '';
+        }, 400);
+      }
+    });
+
+    /* =========================================================
+     *  서버 멤버(/api/members) 기반 캐릭터 목록 / 위치 표시
+     *  - 로컬 members.v1 은 사용하지 않음
+     * ======================================================= */
+
+    const REP = 'representativeId'; // 대표 캐릭터 id (로컬에만 저장)
+
+    let charMarkers   = [];
+    let currentCharId = null;
+
+    // 캐릭터 → 어떤 국가에 속하는지 찾는 함수
+    function resolveCharCountryId(ch) {
+      return (
+        ch.currentCountryId ||   // 여행/현재 위치
+        ch.locationCountryId ||  // 다른 이름 후보
+        ch.homeCountryId   ||    // 출신 국가
+        ch.originCountryId ||    // 출신 국가(다른 이름)
+        ch.birthCountryId  ||    // 출생 국가
+        null
+      );
+    }
+
+    // 리스트/마커 active 상태 동기화
+    function syncCharMarkersActive() {
+      if (!charListEl) return;
+
+      const items = charListEl.querySelectorAll('.char-item');
+      items.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.id === currentCharId);
+      });
+
+      charMarkers.forEach(m => {
+        m.classList.toggle('current', m.dataset.id === currentCharId);
+      });
+    }
+
+    // 서버에서 멤버를 불러와 지도에 표시
+    async function initWorldCharacters() {
+      if (!charListEl || !worldMapEl) return;
+
+      // 로딩 메시지
+      charListEl.innerHTML = '<div class="char-empty">캐릭터 불러오는 중...</div>';
+
+      let members = [];
+      try {
+        const serverList = await apiGet('/api/members');
+        if (Array.isArray(serverList)) {
+          members = serverList;
+        }
+      } catch (e) {
+        console.error('서버 멤버 로드 실패', e);
+        charListEl.innerHTML =
+          '<div class="char-empty">서버에서 캐릭터를 불러올 수 없습니다. (로그인 상태를 확인해 주세요)</div>';
+        return;
+      }
+
+      // 기존 마커 제거
+      charMarkers.forEach(m => m.remove());
+      charMarkers = [];
+      charListEl.innerHTML = '';
+
+      if (!members.length) {
+        const span = document.createElement('div');
+        span.className = 'char-empty';
+        span.textContent = '서버에 등록된 캐릭터가 없습니다.';
+        charListEl.appendChild(span);
+        return;
+      }
+
+      const repId = localStorage.getItem(REP);
+
+      // 대표 캐릭터가 있으면 그걸, 없으면 첫 번째 캐릭터를 기준으로
+      if (!currentCharId) {
+        const hasRep = repId && members.some(m => m.id === repId);
+        currentCharId = hasRep ? repId : members[0].id;
+      }
+
+      members.forEach(ch => {
+        // 캐릭터가 속한 국가 ID 확인 (없으면 중앙 균열 도시 기본값)
+        let countryId = resolveCharCountryId(ch) || 'central_rift_city';
+        let country   = (COUNTRIES || []).find(c => c.id === countryId);
+
+        if (!country) {
+          countryId = 'central_rift_city';
+          country   = (COUNTRIES || []).find(c => c.id === countryId);
+        }
+        if (!country) return;
+
+        // ─ 리스트 아이템 생성 ─
+        const btn = document.createElement('button');
+        btn.className = 'char-item';
+        btn.dataset.id = ch.id;
+
+        const imgSrc   = ch.img || 'https://via.placeholder.com/80x80/1d1f26/777?text=NO+IMG';
+        const roleText = ch.role || ch.jobName || '직업 미지정';
+
+        btn.innerHTML = `
+          <img src="${imgSrc}" alt="">
+          <span>${ch.name || '무명'}</span>
+          <span class="tag">${country.name}</span>
+          ${repId && ch.id === repId ? '<span class="rep-badge">대표</span>' : ''}
+        `;
+
+        // 클릭 시: 해당 캐릭터가 있는 나라로 이동
+        btn.addEventListener('click', () => {
+          currentCharId = ch.id;
+
+          selectCountry(country.id);
+
+          const pin = pins.find(p => p.dataset.id === country.id);
+          if (pin) {
+            pin.classList.add('pin-flash');
+            pin.style.transition = 'transform 0.18s ease, box-shadow 0.18s ease';
+            pin.style.boxShadow = '0 0 20px rgba(212,175,55,.8)';
+            setTimeout(() => {
+              pin.style.boxShadow = '';
+              pin.classList.remove('pin-flash');
+            }, 400);
+          }
+
+          syncCharMarkersActive();
+        });
+
+        charListEl.appendChild(btn);
+
+        // ─ 지도 위 마커 생성 ─
+        const marker = document.createElement('div');
+        marker.className = 'char-marker';
+        marker.style.left = country.x + '%';
+        marker.style.top  = country.y + '%';
+        marker.dataset.id = ch.id;
+        worldMapEl.appendChild(marker);
+        charMarkers.push(marker);
+      });
+
+      syncCharMarkersActive();
+    }
+
+    // 최초 렌더
+    renderPins();
+    selectCountry('central_rift_city');
+    initWorldCharacters();
+
+    // 📌 나중에 서버 월드 연동할 때는:
+    // async function loadWorld() {
+    //   const world = await apiGet('/api/worlds/' + WORLD_ID);
+    //   // world.countries 를 countries 배열 형식으로 변환해서 renderPins 호출
+    // }
+  </script>
+</body>
+</html>

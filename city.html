@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>CITY – 도시 정보</title>
+<style>
+  body{
+    margin:0; background:#0f0f12; color:#e8e6e3;
+    font-family:'Noto Sans KR', sans-serif; padding:20px;
+  }
+  .wrap{max-width:980px; margin:0 auto;}
+  .building-card{
+    padding:12px;
+    margin:10px 0;
+    background:rgba(255,255,255,.05);
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.08);
+    cursor:pointer;
+    transition:.15s;
+  }
+  .building-card:hover{
+    background:rgba(212,175,55,.15);
+    border-color:rgba(212,175,55,.4);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div onclick="history.back()" style="margin-bottom:8px;cursor:pointer;">← 돌아가기</div>
+  <h1 id="cityName" style="font-size:1.4rem;margin-bottom:6px;">도시명</h1>
+  <div id="cityDesc" style="opacity:.8;margin-bottom:14px;">설명</div>
+
+  <h3>구역 / 건물</h3>
+  <div id="buildingList"></div>
+</div>
+
+<script>
+  // 임시 도시 데이터
+  const CITY_DATA = {
+    capital_santia:{
+      name:'산티아드 대성당 도시',
+      desc:'신성력의 중심지',
+      buildings:[
+        { name:'대성당', action:'도서관 연구', to:'library.html' },
+        { name:'성기사단 본부', action:'훈련하기', to:'training.html' },
+        { name:'상인 지구', action:'상점으로', to:'shop.html' },
+        { name:'도서관', action:'기술 연구', to:'compendium.html' }
+      ]
+    }
+  };
+
+  const params = new URLSearchParams(location.search);
+  const cid = params.get('id');
+  const data = CITY_DATA[cid];
+
+  if(data){
+    document.getElementById('cityName').textContent = data.name;
+    document.getElementById('cityDesc').textContent = data.desc;
+    const box = document.getElementById('buildingList');
+
+    data.buildings.forEach(b=>{
+      const el = document.createElement('div');
+      el.className='building-card';
+      el.innerHTML = `<strong>${b.name}</strong><br><span>${b.action}</span>`;
+      el.onclick = () => location.href = b.to;
+      box.appendChild(el);
+    });
+  }
+  
+</script>
+</body>
+</html>

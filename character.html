@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Character – 프로필</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <!-- ✅ 위치 데이터 공통 스크립트 추가 -->
+  <script src="js/world-data.js"></script>
+
   <style>
     :root{
       --bg:#0f0f12;
@@ -317,11 +321,14 @@
     <!-- CENTER: Stats & Skills -->
     <section class="card">
       <h2 class="title" id="cName">캐릭터</h2>
-      <div class="sub" id="cNote" style="margin-bottom:8px"></div>
+      <div class="sub" id="cNote" style="margin-bottom:4px"></div>
+
+      <!-- ✅ 추가: 현재 위치 표시 영역 -->
+      <div class="sub" id="cLocation" style="margin-bottom:8px; color:var(--muted);"></div>
 
       <div class="stat-header"><h3 style="margin:0">스탯</h3><button id="chartToggle" class="btn">방사형 보기</button></div>
       <div id="statsBox"></div>
-      <div class="small" id="statsHelp">기본치 + (특성/숙련도/권능의 ±, % 보정) = 최종치</div>
+      <div class="small" id="statsHelp">기본치 + (직업, 특성/숙련도/권능의 ±, % 보정) = 최종치</div>
 
       <h3 style="margin:16px 0 8px">스킬/특성</h3>
       <div id="skillWrap" class="skills"></div>
@@ -378,6 +385,73 @@
 
     // 항상 스탯에 상시로 적용되는 타입 (전투 여부와 무관)
     const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']);
+
+// ==== 직업 정의 (jobId 기반) ====
+    const JOB_DEFS = {
+      none: {
+        id: 'job_none',
+        name: '무직',
+        stat: { str:0, end:0, agi:0, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      warrior: {
+        id: 'job_warrior',
+        name: '전사',
+        stat: { str:3, end:2, agi:0, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      archer: {
+        id: 'job_archer',
+        name: '궁수',
+        stat: { str:1, end:0, agi:3, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      assassin: {
+        id: 'job_assassin',
+        name: '암살자',
+        stat: { str:1, end:0, agi:4, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      mage: {
+        id: 'job_mage',
+        name: '마법사',
+        stat: { str:0, end:0, agi:0, int:4, mana:3, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      priest: {
+        id: 'job_priest',
+        name: '성직자',
+        stat: { str:0, end:1, agi:0, int:3, mana:3, luck:0 },
+        resource: 'holy',   // ★ 성직자는 신성력 자원 사용
+        hidden: false
+      },
+      // 예시 히든 직업 (원하는 만큼 추가 가능)
+      hiddenSaint: {
+        id: 'job_hidden_saint',
+        name: '성자의 대리자',
+        stat: { str:2, end:3, agi:1, int:4, mana:5, luck:2 },
+        resource: 'holy',
+        hidden: true
+      }
+    };
+
+    const JOB_BY_NAME = {};
+    const JOB_BY_ID   = {};
+    Object.values(JOB_DEFS).forEach(j => {
+      JOB_BY_NAME[j.name] = j;
+      JOB_BY_ID[j.id]     = j;
+    });
+
+    function getJobForCharacter(ch) {
+      if (ch.jobId && JOB_BY_ID[ch.jobId]) return JOB_BY_ID[ch.jobId];
+      if (ch.role && JOB_BY_NAME[ch.role]) return JOB_BY_NAME[ch.role];
+      return JOB_DEFS.none;
+    }
 
     // 등급 정렬 기준 (앞에 있을수록 높은 등급)
     const RANK_ORDER=[
@@ -659,6 +733,53 @@
     }
 
     /* =========================================================
+     *  직업(Job) 기반 스탯 보정
+     *  - 각 캐릭터는 jobId 로 1개 직업만 가진다고 가정
+     *  - 직업은 고정값(flat) 위주, 필요하면 %보정도 확장 가능
+     * ======================================================= */
+    function collectJobMods(ch){
+      const job = getJobForCharacter(ch);
+      const flat    = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+      const pct     = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
+      const sources = [];
+
+      if (!job || !job.stat){
+        return { flat, pct, sources };
+      }
+
+      const s = job.stat;
+      const contrib = {};
+
+      function add(key, flatVal, pctVal){
+        const f  = +(flatVal || 0);
+        const pc = +(pctVal  || 0);
+        if (!f && !pc) return;
+        flat[key] += f;
+        pct[key]  += pc;
+        contrib[key] = { flat:f, pct:pc };
+      }
+
+      add('str',  s.str,  s.strP);
+      add('end',  s.end,  s.endP);
+      add('agi',  s.agi,  s.agiP);
+      add('int',  s.int,  s.intP);
+      add('mana', s.mana, s.manaP);
+      add('luck', s.luck, s.luckP);
+
+      if (Object.keys(contrib).length){
+        sources.push({
+          name: job.name,
+          type: 'job',
+          rank: '',
+          tags: job.hidden ? '히든 직업' : '직업',
+          contrib
+        });
+      }
+
+      return { flat, pct, sources };
+    }    
+
+    /* =========================================================
      *  메인 렌더 함수
      *  - 캐릭터 정보 / 장비 / 타임라인 / 스탯 / 스킬 그룹 출력
      * ======================================================= */
@@ -678,6 +799,17 @@
       $('#cRole').textContent = ch.role||'-';
       $('#cSub').textContent  = ch.sub||'-';
       $('#cImg').src = ch.img||'https://via.placeholder.com/420x560/1d1f26/777?text=NO+IMAGE';
+
+      // ★ 현재 위치 표시
+      const locEl = document.getElementById('cLocation');
+      if (locEl) {
+        try {
+          locEl.textContent = makeLocationLabel(ch.position || null);
+        } catch (e) {
+          console.error('위치 표시 오류:', e);
+          locEl.textContent = '현재 위치: 알 수 없음';
+        }
+      }
 
       /* -------- 장비 정보 출력 -------- */
       const eq = ch.equip||{};
@@ -705,26 +837,36 @@
 
       /* -------- 스탯 계산 준비 -------- */
 
-      const base = ch.stats||{};       // 기본 스탯
-      const mods = collectSkillMods(ch); // 도감 기반 보정값
+      const base = ch.stats||{};          // 기본 스탯
+      const mods = collectSkillMods(ch);  // 도감 기반 보정값
+      const job  = getJobForCharacter(ch); // ★ 직업 정보
+
+      // ★ 직업에 따라 자원 라벨 변경 (성직자 / 히든 성직 계열 → 신성력)
+      const resourceLabel =
+        job && job.resource === 'holy'
+          ? '신성력'
+          : '마나/내력';
 
       // 화면에 표시할 스탯 정의
       const statDefs = [
-        {label:'근력', key:'str'},
-        {label:'내구', key:'end'},
-        {label:'민첩', key:'agi'},
-        {label:'지력', key:'int'},
-        {label:'마나/내력', key:'mana'},
-        {label:'행운', key:'luck'}
+        {label:'근력',   key:'str'},
+        {label:'내구',   key:'end'},
+        {label:'민첩',   key:'agi'},
+        {label:'지력',   key:'int'},
+        {label:resourceLabel, key:'mana'},
+        {label:'행운',   key:'luck'}
       ];
+
+      // ★ 직업 보정 값 수집
+      const jobMods = collectJobMods(ch);
 
       // 각 스탯별 최종 값 계산
       const data = statDefs.map(({label,key:k})=>{
-        const dFlat   = mods.flat[k]||0;          // 특성/숙련도/권능이 주는 고정값
-        const dPct    = mods.pct[k]||0;           // 특성/숙련도/권능이 주는 % 보정
-        const baseVal = base[k]||0;               // 기본치
-        const delta   = dFlat + Math.round(baseVal * (dPct/100)); // 총 변화량
-        const final   = baseVal + delta;          // 최종치
+        const dFlat   = (mods.flat[k] || 0) + (jobMods.flat[k] || 0); // 특성 + 직업 고정값
+        const dPct    = (mods.pct[k]  || 0) + (jobMods.pct[k]  || 0); // 특성 + 직업 %보정
+        const baseVal = base[k] || 0;                                  // 기본치
+        const delta   = dFlat + Math.round(baseVal * (dPct/100));      // 총 변화량
+        const final   = baseVal + delta;                               // 최종치
         return {
           label,
           key:k,
@@ -741,20 +883,21 @@
 
       const tooltipMap = {};
       data.forEach(d=>{
-        // 이 스탯에 기여한 특성/숙련도/권능만 필터링
-        const related = (mods.sources || []).filter(s => s.contrib && s.contrib[d.key]);
-
-        if (!related.length){
-          tooltipMap[d.key] =
-            `기본치: ${d.base}\n` +
-            `(이 스탯에는 현재 특성/숙련도/권능 보정이 적용되지 않습니다.)`;
-          return;
-        }
+        const skillSources = (mods.sources    || []).filter(s => s.contrib && s.contrib[d.key]);
+        const jobSources   = (jobMods.sources || []).filter(s => s.contrib && s.contrib[d.key]);
+        const hasAny       = skillSources.length || jobSources.length;
 
         const lines = [];
         lines.push(`기본치: ${d.base}`);
 
-        related.forEach(s=>{
+        if (!hasAny){
+          lines.push('(이 스탯에는 현재 보정이 적용되지 않습니다.)');
+          tooltipMap[d.key] = lines.join('\n');
+          return;
+        }
+
+        // 특성/숙련도/권능
+        skillSources.forEach(s=>{
           const c = s.contrib[d.key];
           const typeLabel = TYPE_LABELS[s.type] || s.type || '기타';
           const rankText  = s.rank ? ` [${s.rank}]` : '';
@@ -767,6 +910,19 @@
             parts.push(`${c.pct>0?'+':''}${c.pct}%`);
           }
           lines.push(`${typeLabel} ${s.name}${rankText}: ${parts.join(', ')}`);
+        });
+
+        // 직업
+        jobSources.forEach(s=>{
+          const c = s.contrib[d.key];
+          const parts = [];
+          if (c.flat){
+            parts.push(`${c.flat>0?'+':''}${c.flat}`);
+          }
+          if (c.pct){
+            parts.push(`${c.pct>0?'+':''}${c.pct}%`);
+          }
+          lines.push(`직업 ${s.name}: ${parts.join(', ')}`);
         });
 
         tooltipMap[d.key] = lines.join('\n');

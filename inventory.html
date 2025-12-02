@@ -316,7 +316,10 @@
 
     <!-- RIGHT: 상세 / 편집 -->
     <aside class="card">
-      <h3 style="margin:0 0 6px;font-size:1rem">아이템 상세</h3>
+      <h3 style="margin:0 4px 4px;font-size:1rem;display:flex;justify-content:space-between;align-items:center">
+        <span>아이템 상세</span>
+        <span id="currentCharLabel" class="small">선택된 캐릭터 없음</span>
+      </h3>
       <div id="detailForm">
         <div class="field">
           <label for="fName">이름</label>
@@ -371,7 +374,11 @@
   </div>
 
   <script>
-    const INV_KEY = 'inventory.v1';
+    // 캐릭터별 인벤토리 저장용 키
+    const INV_KEY = 'inventory.byCharacter.v1';
+
+    // 현재 선택된 캐릭터 ID (member/character 페이지에서 localStorage에 넣어둔다고 가정)
+    let currentCharId = null;
 
     const $ = s => document.querySelector(s);
 
@@ -382,6 +389,20 @@
       q: '',
       sort: 'name'
     };
+
+    // 현재 선택된 캐릭터 ID를 localStorage에서 찾는다.
+    // 네가 실제로 사용하는 키 이름에 맞춰서 수정해도 된다.
+    function resolveCurrentCharId() {
+      // 예시: member.html / character.html 에서 이렇게 저장했다고 가정
+      //   localStorage.setItem('currentCharacterId', someId);
+      const byCurrentId = localStorage.getItem('currentCharacterId');
+
+      // 혹시 다른 이름을 쓴다면 예비용으로 몇 개 더 체크
+      const bySelected = localStorage.getItem('selectedCharacterId');
+      const byName     = localStorage.getItem('currentCharacterName');
+
+      return byCurrentId || bySelected || byName || null;
+    }
 
     const CATEGORY_LABEL = {
       all: '전체',
@@ -398,20 +419,41 @@
       return Math.random().toString(36).slice(2, 9);
     }
 
+    // 캐릭터별 인벤토리를 로드
     function loadInventory(){
       try{
         const raw = localStorage.getItem(INV_KEY);
-        const arr = raw ? JSON.parse(raw) : [];
-        state.items = Array.isArray(arr) ? arr : [];
+        const map = raw ? JSON.parse(raw) : {};
+
+        if (!currentCharId) {
+          // 캐릭터가 선택되지 않았다면 빈 인벤토리
+          state.items = [];
+          return;
+        }
+
+        const charItems = map[currentCharId];
+        state.items = Array.isArray(charItems) ? charItems : [];
       }catch(e){
         console.error(e);
         state.items = [];
       }
     }
 
+    // 캐릭터별 인벤토리를 저장
     function saveInventory(){
+      if (!currentCharId) {
+        alert('선택된 캐릭터가 없어 인벤토리를 저장할 수 없습니다.');
+        return;
+      }
+
       try{
-        localStorage.setItem(INV_KEY, JSON.stringify(state.items));
+        const raw = localStorage.getItem(INV_KEY);
+        const map = raw ? JSON.parse(raw) : {};
+
+        // 현재 캐릭터 ID에 대응하는 배열로 저장
+        map[currentCharId] = state.items;
+
+        localStorage.setItem(INV_KEY, JSON.stringify(map));
       }catch(e){
         console.error('인벤토리 저장 오류', e);
         alert('인벤토리를 저장하는 도중 오류가 발생했습니다. 브라우저 저장소 용량을 확인해 주세요.');
@@ -674,15 +716,41 @@
       });
     }
 
-    function init(){
-      loadInventory();
+    // 현재 캐릭터 표시용 간단한 라벨 업데이트 (옵션)
+  function updateCurrentCharLabel() {
+    const el = document.getElementById('currentCharLabel');
+    if (!el) return;
+
+    if (!currentCharId) {
+      el.textContent = '선택된 캐릭터 없음';
+    } else {
+      el.textContent = `현재 캐릭터 ID: ${currentCharId}`;
+    }
+  }
+
+  function init(){
+    // 1) 현재 캐릭터 ID 결정
+    currentCharId = resolveCurrentCharId();
+    updateCurrentCharLabel();
+
+    if (!currentCharId) {
+      // 캐릭터가 선택되지 않은 상태라면, 기본 UI만 세팅하고 저장은 막는다
       bindEvents();
       renderCategories();
       renderList();
-      newItem();
+      alert('현재 선택된 캐릭터가 없습니다. member/character 페이지에서 캐릭터를 먼저 선택해 주세요.');
+      return;
     }
 
-    init();
-  </script>
+    // 2) 캐릭터 인벤토리 로드 및 렌더
+    loadInventory();
+    bindEvents();
+    renderCategories();
+    renderList();
+    newItem();
+  }
+
+  init();
+</script>
 </body>
 </html>

@@ -217,528 +217,622 @@
     </section>
   </div>
 
-  <!-- 1) 공통 API 로드 -->
-  <script src="js/api.js"></script>
-
-  <!-- 2) 토큰 없으면 로그인 페이지로 -->
   <script>
-    if (!window.getToken || !getToken()) {
-      window.location.href = 'login.html';
-    }
-  </script>
+  // ===== 공통 스토리지 키 =====
+  const STORE = 'members.v1';
+  const CODEX = 'codex.v1';
 
-  <!-- 3) 전투 로직 스크립트 (기존 script는 이 아래에 그대로 둠) -->
-  <script>
-    // ===== 공통 스토리지 키 =====
-    const STORE = 'members.v1';
-    const CODEX = 'codex.v1';
+  const $ = s => document.querySelector(s);
 
-    const $ = s => document.querySelector(s);
+  // 서버 + localStorage → 멤버 목록 로딩
+  async function loadMembers() {
+    // 1) 먼저 서버에서 시도 (로그인 토큰 기반 → 내 계정 캐릭터만)
+    try {
+      const serverList = await apiGet('/api/members');
 
-    // 서버 + localStorage → 멤버 목록 로딩
-    async function loadMembers(){
-      // 1) 먼저 서버에서 시도
-      try {
-        const serverList = await apiGet('/api/members');
-
-        if (Array.isArray(serverList) && serverList.length > 0) {
-          // 서버에 데이터가 있으면 그걸 진실로 사용
-          return serverList;
-        }
-      } catch (e) {
-        console.error('서버에서 멤버 로드 실패', e);
+      if (Array.isArray(serverList) && serverList.length > 0) {
+        // 서버에 데이터가 있으면 그걸 진실로 사용
+        return serverList;
       }
-
-      // 2) 서버가 비어 있거나 실패한 경우 → localStorage 사용
-      try {
-        const a = localStorage.getItem(STORE);
-        const b = localStorage.getItem('memberData.v1'); // 구버전 호환
-        const parsed = a ? JSON.parse(a) : (b ? JSON.parse(b) : []);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
-    }
-    function loadCodex(){
-      try{
-        return JSON.parse(localStorage.getItem(CODEX) || '[]');
-      }catch{
-        return [];
-      }
+    } catch (e) {
+      console.error('서버에서 멤버 로드 실패', e);
     }
 
-    // === 도감 특성 보정: character.html과 동일한 규칙 ===
-    const RANK_ORDER=[
-      "EX","SSS","SS","S+","S",
-      "A++","A+","A","A-",
-      "B++","B+","B","B-",
-      "C++","C+","C","C-",
-      "D++","D+","D","D-",
-      "F++","F+","F","F-"
-    ];
-    const rankIndex = r=>{
-      const i = RANK_ORDER.indexOf(r || '');
-      return i<0 ? 999 : i;
-    };
-
-
-function collectSkillMods(ch){
-  const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']); // 특성 / 숙련도 / 권능만 항상 스탯에 반영
-  const names = ch.skills || [];
-  const codex = loadCodex();
-  const set   = new Set((names || []).map(s => (s || '').toLowerCase()));
-  const flat  = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
-  const pct   = {str:0,end:0,agi:0,int:0,mana:0,luck:0};
-
-  codex.forEach(e=>{
-    if (!ALWAYS_ON_TYPES.has(e.type)) return;
-    if (!set.has((e.name || '').toLowerCase())) return;
-
-  const m = e.mod  || {};
-  const p = e.modP || {};
-
-  flat.str  += +(m.str  ?? m.atk  ?? 0);
-  flat.end  += +(m.end  ?? m.def  ?? 0);
-  flat.agi  += +(m.agi  ?? m.spd  ?? 0);
-  flat.int  += +(m.int  ?? 0);
-  flat.mana += +(m.mana ?? m.hp   ?? 0);
-  flat.luck += +(m.luck ?? 0);
-
-  pct.str   += +(p.str  ?? p.atk  ?? 0);
-  pct.end   += +(p.end  ?? p.def  ?? 0);
-  pct.agi   += +(p.agi  ?? p.spd  ?? 0);
-  pct.int   += +(p.int  ?? 0);
-  pct.mana  += +(p.mana ?? p.hp   ?? 0);
-  pct.luck  += +(p.luck ?? 0);
-  });
-
-  return {flat, pct};
-}
-
-// 전투 시에만 쓰는 종류 (기술/마법/스킬)
-const BATTLE_ONLY_TYPES = new Set(['tech','magic','skill']);
-
-// 이번 공격에 사용할 전투 스킬 1개 선택
-function pickBattleSkill(att, kind){
-  const names = att.ch.skills || [];
-  if (!names.length) return null;
-
-  const codex = loadCodex();
-  const lowerNames = names.map(n => (n || '').toLowerCase());
-
-  const candidates = codex.filter(e => {
-    if (!BATTLE_ONLY_TYPES.has(e.type)) return false;
-    if (!lowerNames.includes((e.name || '').toLowerCase())) return false;
-    // kind(physical/magic)에 따라 필터를 더 넣고 싶으면 여기서 처리
-    return true;
-  });
-
-  if (!candidates.length) return null;
-  const chosen = candidates[randInt(0, candidates.length - 1)];
-
-  const m = chosen.mod  || {};
-  const p = chosen.modP || {};
-
-  const flat = {
-    str:  +(m.str  ?? m.atk  ?? 0),
-    int:  +(m.int  ?? 0),
-    luck: +(m.luck ?? 0),
-  };
-  const pct  = {
-    str:  +(p.str  ?? p.atk  ?? 0),
-    int:  +(p.int  ?? 0),
-    luck: +(p.luck ?? 0),
-  };
-
-  return { entry: chosen, flat, pct };
-}
-
-    function calcFinalStats(ch){
-      const base = ch.stats || {};
-      const mods = collectSkillMods(ch);
-      const out = {};
-      ["str","end","agi","int","mana","luck"].forEach(k=>{
-        const b = base[k] || 0;
-        const dFlat = mods.flat[k] || 0;
-        const dPct  = mods.pct[k]  || 0;
-        out[k] = b + dFlat + Math.round(b * (dPct/100));
-      });
-      // 파생 스탯
-      out.maxHp = 50 + out.end * 10;
-      out.maxMp = 10 + out.mana * 5;
-      out.atk   = out.str;
-      out.mag   = out.int;
-      out.spd   = out.agi;
-      out.luk   = out.luck;
-      return out;
+    // 2) 서버가 비어 있거나 실패한 경우 → localStorage 사용 (옛 데이터 백업)
+    try {
+      const a = localStorage.getItem(STORE);
+      const b = localStorage.getItem('memberData.v1'); // 구버전 호환
+      const parsed = a ? JSON.parse(a) : (b ? JSON.parse(b) : []);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error(e);
+      return [];
     }
-
-    // ===== 전역 상태 =====
-    const state = {
-      members: [],
-      leftId: null,
-      rightId: null,
-      battle: null
-    };
-
-    // ===== UI 렌더링 =====
-    function fillSelects(){
-      const leftSel  = $('#leftSel');
-      const rightSel = $('#rightSel');
-      leftSel.innerHTML  = '';
-      rightSel.innerHTML = '';
-
-      if(!state.members.length){
-        leftSel.innerHTML  = '<option>캐릭터 없음</option>';
-        rightSel.innerHTML = '<option>캐릭터 없음</option>';
-        return;
-      }
-      state.members.forEach((ch,idx)=>{
-        const opt1 = document.createElement('option');
-        opt1.value = ch.id;
-        opt1.textContent = ch.name || `캐릭터 ${idx+1}`;
-        leftSel.appendChild(opt1);
-
-        const opt2 = document.createElement('option');
-        opt2.value = ch.id;
-        opt2.textContent = ch.name || `캐릭터 ${idx+1}`;
-        rightSel.appendChild(opt2);
-      });
-
-      // 기본값: 첫 번째 / 두 번째
-      state.leftId  = state.members[0]?.id || null;
-      state.rightId = state.members[1]?.id || state.members[0]?.id || null;
-      if(state.leftId)  leftSel.value  = state.leftId;
-      if(state.rightId) rightSel.value = state.rightId;
-
-      updateSideInfo('left');
-      updateSideInfo('right');
-    }
-
-    function updateSideInfo(side){
-      const isLeft = side === 'left';
-      const id   = isLeft ? state.leftId : state.rightId;
-      const info = isLeft ? $('#leftInfo') : $('#rightInfo');
-      const ch   = state.members.find(c=>c.id===id);
-
-      info.innerHTML = '';
-      const img  = document.createElement('img');
-      const meta = document.createElement('div');
-      meta.className = 'char-meta';
-
-      if(!ch){
-        img.alt = '';
-        meta.innerHTML = '<div class="small">캐릭터가 없습니다.</div>';
-      }else{
-        img.src = ch.img || 'https://via.placeholder.com/120x160/1d1f26/777?text=NO+IMAGE';
-        img.alt = ch.name || 'portrait';
-        const st = calcFinalStats(ch);
-        meta.innerHTML = `
-          <strong>${ch.name || '무명'}</strong>
-          <div class="small">${ch.role || '-'} / ${ch.sub || ''}</div>
-          <div class="statRow">
-            <span class="small">근력</span>
-            <div class="bar"><span style="width:${Math.min(100,st.str)}%"></span></div>
-            <span class="small">${st.str}</span>
-          </div>
-          <div class="statRow">
-            <span class="small">내구</span>
-            <div class="bar"><span style="width:${Math.min(100,st.end)}%"></span></div>
-            <span class="small">${st.end}</span>
-          </div>
-          <div class="statRow">
-            <span class="small">민첩</span>
-            <div class="bar"><span style="width:${Math.min(100,st.agi)}%"></span></div>
-            <span class="small">${st.agi}</span>
-          </div>
-          <div class="statRow">
-            <span class="small">지력</span>
-            <div class="bar"><span style="width:${Math.min(100,st.int)}%"></span></div>
-            <span class="small">${st.int}</span>
-          </div>
-          <div class="statRow">
-            <span class="small">마나</span>
-            <div class="bar"><span style="width:${Math.min(100,st.mana)}%"></span></div>
-            <span class="small">${st.mana}</span>
-          </div>
-          <div class="statRow">
-            <span class="small">행운</span>
-            <div class="bar"><span style="width:${Math.min(100,st.luck)}%"></span></div>
-            <span class="small">${st.luck}</span>
-          </div>
-        `;
-      }
-      info.appendChild(img);
-      info.appendChild(meta);
-    }
-
-    // ===== 전투 상태 생성 =====
-    function makeFighter(ch){
-      const s = calcFinalStats(ch);
-      return {
-        ch,
-        stats:s,
-        hp:s.maxHp,
-        mp:s.maxMp
-      };
-    }
-
-    function resetBattle(){
-      const leftCh  = state.members.find(c=>c.id===state.leftId);
-      const rightCh = state.members.find(c=>c.id===state.rightId);
-      const log = $('#log');
-
-      if(!leftCh || !rightCh){
-        log.textContent = '[에러] 양쪽 모두 캐릭터를 선택해야 합니다.';
-        return;
-      }
-
-      state.battle = {
-        turn:1,
-        left: makeFighter(leftCh),
-        right: makeFighter(rightCh),
-        finished:false
-      };
-
-      $('#lName').textContent = leftCh.name || '무명';
-      $('#rName').textContent = rightCh.name || '무명';
-
-      updateHpUi();
-      log.textContent =
-        `전투가 시작되었습니다!\n\n` +
-        `아군: ${leftCh.name || '무명'}\n` +
-        `적군: ${rightCh.name || '무명'}\n\n` +
-        `[전투 규칙]\n- 민첩이 높은 쪽이 먼저 행동합니다.\n- 근력/지력을 기준으로 물리/마법 공격을 선택합니다.\n- 행운은 명중률, 크리티컬 확률에 영향을 줍니다.\n`;
-
-      $('#turnInfo').textContent = '1턴 시작';
-      $('#stepBtn').disabled = false;
-      $('#autoBtn').disabled = false;
-    }
-
-    function updateHpUi(){
-      const b = state.battle;
-      if(!b) return;
-      const lHpPct = Math.max(0, Math.min(100, (b.hpLeftPct || (b.left.hp / b.left.stats.maxHp * 100))));
-      const rHpPct = Math.max(0, Math.min(100, (b.hpRightPct || (b.right.hp / b.right.stats.maxHp * 100))));
-
-      $('#lHpText').textContent = `${Math.max(0,b.left.hp)} / ${b.left.stats.maxHp}`;
-      $('#rHpText').textContent = `${Math.max(0,b.right.hp)} / ${b.right.stats.maxHp}`;
-      $('#lMpText').textContent = `${Math.max(0,b.left.mp)} / ${b.left.stats.maxMp}`;
-      $('#rMpText').textContent = `${Math.max(0,b.right.mp)} / ${b.right.stats.maxMp}`;
-      $('#lHpBar').style.width = `${lHpPct}%`;
-      $('#rHpBar').style.width = `${rHpPct}%`;
-    }
-
-    function appendLog(text){
-      const log = $('#log');
-      log.textContent += '\n' + text;
-      log.scrollTop = log.scrollHeight;
-    }
-
-    function randInt(min,max){
-      return Math.floor(Math.random()*(max-min+1))+min;
-    }
-
-    function pickSkillName(fighter, kind){
-      const skills = fighter.ch.skills || [];
-      if(!skills.length){
-        return kind === 'magic' ? '마법 공격' : '공격';
-      }
-      return skills[randInt(0, skills.length-1)];
-    }
-
-    function calcHitChance(att, def){
-      // 기본 80% + 민첩 차이 + 행운 보정
-      let base = 80 + (att.stats.spd - def.stats.spd)*0.5 + (att.stats.luk - def.stats.luk)*0.3;
-      return Math.max(10, Math.min(98, base));
-    }
-
-    function calcCritChance(att){
-      // 기본 10% + 행운 * 0.5
-      return Math.max(0, Math.min(80, 10 + att.stats.luk*0.5));
-    }
-
-    function doAttack(att, def){
-  // 공격 방식 결정: 근력 >= 지력 → 물리 / 반대면 마법
-  const useMagic = att.stats.mag > att.stats.atk && att.mp >= 10;
-  const kind = useMagic ? 'magic' : 'physical';
-
-  // 이번 공격에 쓸 전투용 스킬 1개 (기술/마법/스킬)
-  const battleSkill = pickBattleSkill(att, kind);
-
-  const hitChance  = calcHitChance(att, def);
-  const rollHit    = Math.random()*100;
-  if(rollHit > hitChance){
-    return `${att.ch.name || '무명'}의 공격! 그러나 빗나갔다… (명중률 ${hitChance.toFixed(1)}%)`;
   }
 
-  const critChance = calcCritChance(att);
-  const isCrit     = (Math.random()*100) < critChance;
+  // 도감 로딩 (특성/숙련도/권능 보정용)
+  function loadCodex() {
+    try {
+      return JSON.parse(localStorage.getItem(CODEX) || '[]');
+    } catch {
+      return [];
+    }
+  }
 
-  // --- 공격력 계산: 기본 스탯 + (해당 스킬의 보정) ---
-  let atkBase  = useMagic ? att.stats.mag : att.stats.atk;
-  let atkFinal = atkBase;
+  // === 도감 특성 보정: character.html과 동일한 규칙과 일관성 유지용 ===
+  const RANK_ORDER = [
+    "EX","SSS","SS","S+","S",
+    "A++","A+","A","A-",
+    "B++","B+","B","B-",
+    "C++","C+","C","C-",
+    "D++","D+","D","D-",
+    "F++","F+","F","F-"
+  ];
+  const rankIndex = r => {
+    const i = RANK_ORDER.indexOf(r || '');
+    return i < 0 ? 999 : i;
+  };
 
-  if (battleSkill){
-    const {flat, pct} = battleSkill;
-    if (useMagic){
-      const f = flat.int || 0;
-      const p = pct.int  || 0;
-      atkFinal = atkBase + f + Math.round(atkBase * (p/100));
+  // 항상 스탯에 반영되는 특성 타입
+  function collectSkillMods(ch) {
+    const ALWAYS_ON_TYPES = new Set(['trait','proficiency','authority']); // 특성 / 숙련도 / 권능
+    const names = ch.skills || [];
+    const codex = loadCodex();
+
+    // 스킬 배열이 문자열/객체 섞여 있을 수 있으므로 이름만 뽑아서 Set 생성
+    const set = new Set((names || []).map(s => {
+      if (!s) return '';
+      if (typeof s === 'string') return s.toLowerCase();
+      return (s.name || '').toLowerCase();
+    }));
+
+    const flat = { str:0, end:0, agi:0, int:0, mana:0, luck:0 };
+    const pct  = { str:0, end:0, agi:0, int:0, mana:0, luck:0 };
+
+    codex.forEach(e => {
+      if (!ALWAYS_ON_TYPES.has(e.type)) return;
+      if (!set.has((e.name || '').toLowerCase())) return;
+
+      const m = e.mod  || {};
+      const p = e.modP || {};
+
+      flat.str  += +(m.str  ?? m.atk  ?? 0);
+      flat.end  += +(m.end  ?? m.def  ?? 0);
+      flat.agi  += +(m.agi  ?? m.spd  ?? 0);
+      flat.int  += +(m.int  ?? 0);
+      flat.mana += +(m.mana ?? m.hp   ?? 0);
+      flat.luck += +(m.luck ?? 0);
+
+      pct.str   += +(p.str  ?? p.atk  ?? 0);
+      pct.end   += +(p.end  ?? p.def  ?? 0);
+      pct.agi   += +(p.agi  ?? p.spd  ?? 0);
+      pct.int   += +(p.int  ?? 0);
+      pct.mana  += +(p.mana ?? p.hp   ?? 0);
+      pct.luck  += +(p.luck ?? 0);
+    });
+
+    return { flat, pct };
+  }
+
+  // 전투 시에만 쓰는 종류 (기술/마법/스킬)
+  const BATTLE_ONLY_TYPES = new Set(['tech','magic','skill']);
+
+  // 이번 공격에 사용할 전투 스킬 1개 선택
+  function pickBattleSkill(att, kind) {
+    const names = att.ch.skills || [];
+    if (!names.length) return null;
+
+    const codex = loadCodex();
+    const lowerNames = names.map(n => {
+      if (!n) return '';
+      if (typeof n === 'string') return n.toLowerCase();
+      return (n.name || '').toLowerCase();
+    });
+
+    const candidates = codex.filter(e => {
+      if (!BATTLE_ONLY_TYPES.has(e.type)) return false;
+      if (!lowerNames.includes((e.name || '').toLowerCase())) return false;
+      // kind(physical/magic)에 따라 필터를 더 넣고 싶으면 여기서 처리
+      return true;
+    });
+
+    if (!candidates.length) return null;
+    const chosen = candidates[randInt(0, candidates.length - 1)];
+
+    const m = chosen.mod  || {};
+    const p = chosen.modP || {};
+
+    const flat = {
+      str:  +(m.str  ?? m.atk  ?? 0),
+      int:  +(m.int  ?? 0),
+      luck: +(m.luck ?? 0),
+    };
+    const pct  = {
+      str:  +(p.str  ?? p.atk  ?? 0),
+      int:  +(p.int  ?? 0),
+      luck: +(p.luck ?? 0),
+    };
+
+    return { entry: chosen, flat, pct };
+  }
+
+  // 전투에 항상 영향을 주는 패시브 특성 타입
+  // (도감에서 type이 'trait', 'proficiency', 'authority' 인 것들)
+  const ALWAYS_ON_TYPES = new Set(['trait', 'proficiency', 'authority']);
+
+  function collectSkillMods(ch) {
+    const flat = { str:0, end:0, agi:0, int:0, mana:0, luck:0 };
+    const pct  = { str:0, end:0, agi:0, int:0, mana:0, luck:0 };
+    let mpRegen = 0;  // 🔹 추가: 턴당 마나 재생 합산용
+
+    const owned = new Set((ch.skills || []).map(s => s.id || s.name).filter(Boolean));
+    const codex = loadCodex();
+
+    codex.forEach(e => {
+      if(!ALWAYS_ON_TYPES.has(e.type)) return;
+      if(!owned.has(e.id) && !owned.has(e.name)) return;
+
+      const m = e.mod  || {};
+      const p = e.modP || {};
+
+      // 고정값
+      flat.str  += +(m.str  ?? m.atk ?? 0);
+      flat.end  += +(m.end  ?? m.def ?? 0);
+      flat.agi  += +(m.agi  ?? m.spd ?? 0);
+      flat.int  += +(m.int  ?? 0);
+      flat.mana += +(m.mana ?? m.hp  ?? 0);
+      flat.luck += +(m.luck ?? 0);
+
+      // % 보정
+      pct.str   += +(p.str  ?? p.atk ?? 0);
+      pct.end   += +(p.end  ?? p.def ?? 0);
+      pct.agi   += +(p.agi  ?? p.spd ?? 0);
+      pct.int   += +(p.int  ?? 0);
+      pct.mana  += +(p.mana ?? p.hp   ?? 0);
+      pct.luck  += +(p.luck ?? 0);
+
+      // 🔹 추가: 이 특성이 갖고 있는 턴당 마나 재생량
+      if (typeof e.mpRegen === 'number') {
+        mpRegen += e.mpRegen;
+      }
+    });
+
+    return { flat, pct, mpRegen };
+  }
+
+// 최종 전투 스탯 계산 (기본 스탯 + 특성 보정)
+function calcFinalStats(ch) {
+  const base = ch.stats || {};
+  const mods = collectSkillMods(ch);
+  const out = {};
+
+  ["str","end","agi","int","mana","luck"].forEach(k => {
+    const b     = base[k] || 0;
+    const dFlat = mods.flat[k] || 0;
+    const dPct  = mods.pct[k]  || 0;
+    out[k] = b + dFlat + Math.round(b * (dPct / 100));
+  });
+
+  // 파생 스탯
+  out.maxHp = 50 + out.end * 10;
+  out.maxMp = 10 + out.mana * 5;
+  out.atk   = out.str;
+  out.mag   = out.int;
+  out.spd   = out.agi;
+  out.luk   = out.luck;
+  return out;
+}
+
+
+  // ===== 전역 상태 =====
+  const state = {
+    members: [],
+    leftId:  null,
+    rightId: null,
+    battle:  null
+  };
+
+  // ===== UI 렌더링 =====
+  function fillSelects() {
+    const leftSel  = $('#leftSel');
+    const rightSel = $('#rightSel');
+    leftSel.innerHTML  = '';
+    rightSel.innerHTML = '';
+
+    if (!state.members.length) {
+      leftSel.innerHTML  = '<option>캐릭터 없음</option>';
+      rightSel.innerHTML = '<option>캐릭터 없음</option>';
+      return;
+    }
+
+    state.members.forEach((ch, idx) => {
+      const opt1 = document.createElement('option');
+      opt1.value       = ch.id;
+      opt1.textContent = ch.name || `캐릭터 ${idx+1}`;
+      leftSel.appendChild(opt1);
+
+      const opt2 = document.createElement('option');
+      opt2.value       = ch.id;
+      opt2.textContent = ch.name || `캐릭터 ${idx+1}`;
+      rightSel.appendChild(opt2);
+    });
+
+    // 기본값: 첫 번째 / 두 번째
+    state.leftId  = state.members[0]?.id || null;
+    state.rightId = state.members[1]?.id || state.members[0]?.id || null;
+
+    if (state.leftId)  leftSel.value  = state.leftId;
+    if (state.rightId) rightSel.value = state.rightId;
+
+    updateSideInfo('left');
+    updateSideInfo('right');
+  }
+
+  function updateSideInfo(side) {
+    const isLeft = side === 'left';
+    const id     = isLeft ? state.leftId : state.rightId;
+    const info   = isLeft ? $('#leftInfo') : $('#rightInfo');
+    const ch     = state.members.find(c => c.id === id);
+
+    info.innerHTML = '';
+    const img  = document.createElement('img');
+    const meta = document.createElement('div');
+    meta.className = 'char-meta';
+
+    if (!ch) {
+      img.alt = '';
+      meta.innerHTML = '<div class="small">캐릭터가 없습니다.</div>';
     } else {
-      const f = flat.str || 0;
-      const p = pct.str  || 0;
-      atkFinal = atkBase + f + Math.round(atkBase * (p/100));
+      img.src = ch.img || 'https://via.placeholder.com/120x160/1d1f26/777?text=NO+IMAGE';
+      img.alt = ch.name || 'portrait';
+      const st = calcFinalStats(ch);
+      meta.innerHTML = `
+        <strong>${ch.name || '무명'}</strong>
+        <div class="small">${ch.role || '-'} / ${ch.sub || ''}</div>
+        <div class="statRow">
+          <span class="small">근력</span>
+          <div class="bar"><span style="width:${Math.min(100, st.str)}%"></span></div>
+          <span class="small">${st.str}</span>
+        </div>
+        <div class="statRow">
+          <span class="small">내구</span>
+          <div class="bar"><span style="width:${Math.min(100, st.end)}%"></span></div>
+          <span class="small">${st.end}</span>
+        </div>
+        <div class="statRow">
+          <span class="small">민첩</span>
+          <div class="bar"><span style="width:${Math.min(100, st.agi)}%"></span></div>
+          <span class="small">${st.agi}</span>
+        </div>
+        <div class="statRow">
+          <span class="small">지력</span>
+          <div class="bar"><span style="width:${Math.min(100, st.int)}%"></span></div>
+          <span class="small">${st.int}</span>
+        </div>
+        <div class="statRow">
+          <span class="small">마나</span>
+          <div class="bar"><span style="width:${Math.min(100, st.mana)}%"></span></div>
+          <span class="small">${st.mana}</span>
+        </div>
+        <div class="statRow">
+          <span class="small">행운</span>
+          <div class="bar"><span style="width:${Math.min(100, st.luck)}%"></span></div>
+          <span class="small">${st.luck}</span>
+        </div>
+      `;
     }
+    info.appendChild(img);
+    info.appendChild(meta);
   }
 
-  let dmgBase;
-  if(kind === 'magic'){
-    // 마법 피해: 지력 기반, 상대 지력으로 약간 감소
-    dmgBase = atkFinal*1.2 - def.stats.int*0.3;
-    att.mp = Math.max(0, att.mp - 10); // 마법은 MP 10 소모
-  }else{
-    // 물리 피해: 근력 기반, 상대 내구로 감소
-    dmgBase = atkFinal*1.1 - def.stats.end*0.4;
-  }
-  if(dmgBase < 1) dmgBase = 1;
+  // ===== 전투 상태 생성 =====
+  function makeFighter(ch) {
+  const s    = calcFinalStats(ch);
+  const mods = collectSkillMods(ch);  // 🔹 패시브 특성에서 mpRegen 가져오기
 
-  if(isCrit){
-    dmgBase *= 1.5;
-  }
+  return {
+    ch,          // 원본 캐릭터 정보
+    stats: s,    // 최종 스탯
+    hp: s.maxHp, // 현재 HP
+    mp: s.maxMp, // 현재 MP
 
-  const variance = 0.85 + Math.random()*0.3; // ±15%
-  const finalDmg = Math.max(1, Math.round(dmgBase * variance));
-  def.hp = Math.max(0, def.hp - finalDmg);
-
-  // 로그에 찍힐 이름: 전투용 스킬 있으면 그 이름, 없으면 기존 로직
-  const skillName =
-    (battleSkill && battleSkill.entry && battleSkill.entry.name) ||
-    pickSkillName(att, useMagic ? 'magic' : 'physical');
-
-  let line = `${att.ch.name || '무명'}가 ${skillName}을(를) 사용했다! ${finalDmg} 피해.`;
-  line += isCrit ? ` (치명타! 확률 ${critChance.toFixed(1)}%)` : '';
-  return line;
+    // 🔹 턴당 마나 재생량 (특성/숙련도/권능에서 온 합산값)
+    mpRegen: mods.mpRegen || 0
+  };
 }
 
+  function resetBattle() {
+    const leftCh  = state.members.find(c => c.id === state.leftId);
+    const rightCh = state.members.find(c => c.id === state.rightId);
+    const log     = $('#log');
 
-    function stepTurn(){
-      const b = state.battle;
-      if(!b || b.finished){
-        return;
+    if (!leftCh || !rightCh) {
+      log.textContent = '[에러] 양쪽 모두 캐릭터를 선택해야 합니다.';
+      return;
+    }
+
+    state.battle = {
+      turn: 1,
+      left: makeFighter(leftCh),
+      right: makeFighter(rightCh),
+      finished: false
+    };
+
+    $('#lName').textContent = leftCh.name  || '무명';
+    $('#rName').textContent = rightCh.name || '무명';
+
+    updateHpUi();
+    log.textContent =
+      `전투가 시작되었습니다!\n\n` +
+      `아군: ${leftCh.name  || '무명'}\n` +
+      `적군: ${rightCh.name || '무명'}\n\n` +
+      `[전투 규칙]\n- 민첩이 높은 쪽이 먼저 행동합니다.\n- 근력/지력을 기준으로 물리/마법 공격을 선택합니다.\n- 행운은 명중률, 크리티컬 확률에 영향을 줍니다.\n`;
+
+    $('#turnInfo').textContent = '1턴 시작';
+    $('#stepBtn').disabled = false;
+    $('#autoBtn').disabled = false;
+  }
+
+  function updateHpUi() {
+    const b = state.battle;
+    if (!b) return;
+
+    const lHpPct = Math.max(0, Math.min(100, (b.left.hp  / b.left.stats.maxHp  * 100)));
+    const rHpPct = Math.max(0, Math.min(100, (b.right.hp / b.right.stats.maxHp * 100)));
+
+    $('#lHpText').textContent = `${Math.max(0, b.left.hp)}  / ${b.left.stats.maxHp}`;
+    $('#rHpText').textContent = `${Math.max(0, b.right.hp)} / ${b.right.stats.maxHp}`;
+    $('#lMpText').textContent = `${Math.max(0, b.left.mp)}  / ${b.left.stats.maxMp}`;
+    $('#rMpText').textContent = `${Math.max(0, b.right.mp)} / ${b.right.stats.maxMp}`;
+    $('#lHpBar').style.width = `${lHpPct}%`;
+    $('#rHpBar').style.width = `${rHpPct}%`;
+  }
+
+  function appendLog(text) {
+    const log = $('#log');
+    log.textContent += '\n' + text;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function calcHitChance(att, def) {
+    // 기본 80% + 민첩 차이 + 행운 보정
+    let base = 80 + (att.stats.spd - def.stats.spd) * 0.5 + (att.stats.luk - def.stats.luk) * 0.3;
+    return Math.max(10, Math.min(98, base));
+  }
+
+  function calcCritChance(att) {
+    // 기본 10% + 행운 * 0.5
+    return Math.max(0, Math.min(80, 10 + att.stats.luk * 0.5));
+  }
+
+  function doAttack(att, def) {
+    // 공격 방식 결정: 지력이 더 높고 MP가 충분하면 마법, 아니면 물리
+    const useMagic = att.stats.mag > att.stats.atk && att.mp >= 10;
+    const kind     = useMagic ? 'magic' : 'physical';
+
+    // 이번 공격에 쓸 전투용 스킬 1개 (기술/마법/스킬)
+    const battleSkill = pickBattleSkill(att, kind);
+
+    const hitChance = calcHitChance(att, def);
+    const rollHit   = Math.random() * 100;
+    if (rollHit > hitChance) {
+      return `${att.ch.name || '무명'}의 공격! 그러나 빗나갔다… (명중률 ${hitChance.toFixed(1)}%)`;
+    }
+
+    const critChance = calcCritChance(att);
+    const isCrit     = (Math.random() * 100) < critChance;
+
+    // --- 공격력 계산: 기본 스탯 + (해당 스킬의 보정) ---
+    let atkBase  = useMagic ? att.stats.mag : att.stats.atk;
+    let atkFinal = atkBase;
+
+    if (battleSkill) {
+      const { flat, pct } = battleSkill;
+      if (useMagic) {
+        const f = flat.int || 0;
+        const p = pct.int  || 0;
+        atkFinal = atkBase + f + Math.round(atkBase * (p / 100));
+      } else {
+        const f = flat.str || 0;
+        const p = pct.str  || 0;
+        atkFinal = atkBase + f + Math.round(atkBase * (p / 100));
       }
-      const left  = b.left;
-      const right = b.right;
+    }
 
-      // 이미 한쪽이 쓰러졌다면 종료
-      if(left.hp <= 0 || right.hp <= 0){
-        endBattle();
-        return;
-      }
+    let dmgBase;
+    if (kind === 'magic') {
+      // 마법 피해: 지력 기반, 상대 지력으로 약간 감소
+      dmgBase = atkFinal * 1.2 - def.stats.int * 0.3;
+      att.mp = Math.max(0, att.mp - 10); // 마법은 MP 10 소모
+    } else {
+      // 물리 피해: 근력 기반, 상대 내구로 감소
+      dmgBase = atkFinal * 1.1 - def.stats.end * 0.4;
+    }
+    if (dmgBase < 1) dmgBase = 1;
 
-      appendLog('\n────────────');
-      appendLog(`[턴 ${b.turn}]`);
+    if (isCrit) {
+      dmgBase *= 1.5;
+    }
 
-      // 턴 순서: 민첩 + 약간의 랜덤
-      const leftInit  = left.stats.spd  + randInt(0,5);
-      const rightInit = right.stats.spd + randInt(0,5);
+    const variance = 0.85 + Math.random() * 0.3; // ±15%
+    const finalDmg = Math.max(1, Math.round(dmgBase * variance));
+    def.hp = Math.max(0, def.hp - finalDmg);
 
-      const first  = leftInit >= rightInit ? left  : right;
-      const second = leftInit >= rightInit ? right : left;
+    // 로그에 찍힐 이름
+    // - 전투용 스킬(battleSkill)이 있으면: 그 이름 사용 (tech / magic / skill 만)
+    // - 없으면: 그냥 "공격" / "마법 공격" 같은 일반 이름만 사용
+    let skillName;
+    if (battleSkill && battleSkill.entry && battleSkill.entry.name) {
+      skillName = battleSkill.entry.name;
+    } else {
+      skillName = useMagic ? '마법 공격' : '공격';
+    }
 
-      const firstName  = first.ch.name  || '무명';
-      const secondName = second.ch.name || '무명';
+    let line = `${att.ch.name || '무명'}가 ${skillName}을(를) 사용했다! ${finalDmg} 피해.`;
+    line += isCrit ? ` (치명타! 확률 ${critChance.toFixed(1)}%)` : '';
+    return line;
+  }
 
-      appendLog(`선제권: ${leftInit >= rightInit ? '아군' : '적군'} (${leftInit} vs ${rightInit})`);
+  function endBattle() {
+    const b = state.battle;
+    if (!b || b.finished) return;
+    b.finished = true;
+    $('#stepBtn').disabled = true;
+    $('#autoBtn').disabled = true;
 
-      // 1번째 행동
-      appendLog(doAttack(first, second));
-      updateHpUi();
-      if(second.hp <= 0){
-        appendLog(`${secondName}은(는) 쓰러졌다!`);
-        endBattle();
-        b.turn++;
-        $('#turnInfo').textContent = `${b.turn-1}턴 종료 (전투 종료)`;
-        return;
-      }
+    const lh = b.left.hp;
+    const rh = b.right.hp;
+    if (lh > 0 && rh <= 0) {
+      appendLog('\n★ 아군 승리!');
+    } else if (rh > 0 && lh <= 0) {
+      appendLog('\n★ 적군 승리!');
+    } else {
+      appendLog('\n★ 양쪽 모두 쓰러졌다. 무승부!');
+    }
+  }
 
-      // 2번째 행동
-      appendLog(doAttack(second, first));
-      updateHpUi();
-      if(first.hp <= 0){
-        appendLog(`${firstName}은(는) 쓰러졌다!`);
-        endBattle();
-        b.turn++;
-        $('#turnInfo').textContent = `${b.turn-1}턴 종료 (전투 종료)`;
-        return;
-      }
+  // 🔹 턴 시작 시 마나 재생 처리
+function applyManaRegenForTurn(b) {
+  if (!b) return;
 
+  [b.left, b.right].forEach(f => {
+    if (!f || !f.stats) return;
+
+    const regen = f.mpRegen || 0;
+    if (!regen || regen <= 0) return;
+
+    // 🔹 신성력 자원(holy)은 재생 금지
+    //   - 나중에 캐릭터 저장 시 ch.resourceType = 'holy' 같이 세팅해 두면 됨
+    const resourceType =
+      (f.ch && f.ch.resourceType) ||
+      (f.ch && f.ch.resource) ||
+      'mana';
+
+    if (resourceType === 'holy') {
+      return; // 신성력은 재생 안 함
+    }
+
+    const maxMp = f.stats.maxMp || 0;
+    if (maxMp <= 0) return;
+
+    const before = f.mp;
+    const after  = Math.min(maxMp, before + regen);
+    if (after <= before) return;
+
+    f.mp = after;
+    appendLog(
+      `${f.ch.name || '무명'}의 마나가 ${regen} 회복되었습니다. ` +
+      `(${before} → ${after})`
+    );
+  });
+}
+
+  function stepTurn() {
+    const b = state.battle;
+    if (!b || b.finished) return;
+
+    const left  = b.left;
+    const right = b.right;
+
+    // 이미 한쪽이 쓰러졌다면 종료
+    if (left.hp <= 0 || right.hp <= 0) {
+      endBattle();
+      return;
+    }
+
+    appendLog('\n────────────');
+    appendLog(`[턴 ${b.turn}]`);
+
+    // 🔹 턴 시작 시 마나 재생 처리 (마나만, 신성력은 제외)
+    applyManaRegenForTurn(b);
+    updateHpUi(); // MP 바 갱신
+
+    // 턴 순서: 민첩 + 약간의 랜덤
+    const leftInit  = left.stats.spd  + randInt(0, 5);
+    const rightInit = right.stats.spd + randInt(0, 5);
+
+    const first  = leftInit >= rightInit ? left  : right;
+    const second = leftInit >= rightInit ? right : left;
+
+    const firstName  = first.ch.name  || '무명';
+    const secondName = second.ch.name || '무명';
+
+    appendLog(`선제권: ${leftInit >= rightInit ? '아군' : '적군'} (${leftInit} vs ${rightInit})`);
+
+    // 1번째 행동
+    appendLog(doAttack(first, second));
+    updateHpUi();
+    if (second.hp <= 0) {
+      appendLog(`${secondName}은(는) 쓰러졌다!`);
+      endBattle();
       b.turn++;
-      $('#turnInfo').textContent = `${b.turn}턴 준비`;
+      $('#turnInfo').textContent = `${b.turn - 1}턴 종료 (전투 종료)`;
+      return;
     }
 
-    function endBattle(){
-      const b = state.battle;
-      if(!b || b.finished) return;
-      b.finished = true;
-      $('#stepBtn').disabled = true;
-      $('#autoBtn').disabled = true;
-
-      const lh = b.left.hp, rh = b.right.hp;
-      if(lh > 0 && rh <= 0){
-        appendLog('\n★ 아군 승리!');
-      }else if(rh > 0 && lh <= 0){
-        appendLog('\n★ 적군 승리!');
-      }else{
-        appendLog('\n★ 양쪽 모두 쓰러졌다. 무승부!');
-      }
+    // 2번째 행동
+    appendLog(doAttack(second, first));
+    updateHpUi();
+    if (first.hp <= 0) {
+      appendLog(`${firstName}은(는) 쓰러졌다!`);
+      endBattle();
+      b.turn++;
+      $('#turnInfo').textContent = `${b.turn - 1}턴 종료 (전투 종료)`;
+      return;
     }
 
-    function autoBattle(){
-      const b = state.battle;
-      if(!b) return;
-      let safety = 50; // 최대 턴 수 제한
-      while(!b.finished && safety-- > 0){
-        stepTurn();
-      }
+    b.turn++;
+    $('#turnInfo').textContent = `${b.turn}턴 준비`;
+  }
+
+  function autoBattle() {
+    const b = state.battle;
+    if (!b) return;
+    let safety = 50; // 최대 턴 수 제한
+    while (!b.finished && safety-- > 0) {
+      stepTurn();
+    }
+  }
+
+  // ===== 초기화 =====
+  async function init() {
+    // 서버 + 로컬에서 멤버 목록 로딩
+    state.members = await loadMembers();
+
+    if (!state.members.length) {
+      $('#log').textContent =
+        '[안내] 저장된 캐릭터가 없습니다.\nmember.html에서 캐릭터를 먼저 생성해 주세요.';
+      $('#startBtn').disabled = true; // ← 오타 주의: disable 가 아니라 disabled
+      return;
     }
 
-    // ===== 이벤트 바인딩 =====
-    async function init(){
-      // 서버 + 로컬에서 멤버 목록 로딩
-      state.members = await loadMembers();
+    fillSelects();
 
-      if(!state.members.length){
-        $('#log').textContent =
-          '[안내] 저장된 캐릭터가 없습니다.\nmember.html에서 캐릭터를 먼저 생성해 주세요.';
-        $('#startBtn').disable = true;
-        return;
-      }
+    $('#leftSel').addEventListener('change', e => {
+      state.leftId = e.target.value;
+      updateSideInfo('left');
+    });
+    $('#rightSel').addEventListener('change', e => {
+      state.rightId = e.target.value;
+      updateSideInfo('right');
+    });
 
-      fillSelects();
+    $('#startBtn').addEventListener('click', () => {
+      resetBattle();
+    });
+    $('#stepBtn').addEventListener('click', () => {
+      stepTurn();
+    });
+    $('#autoBtn').addEventListener('click', () => {
+      autoBattle();
+    });
+  }
 
-      $('#leftSel').addEventListener('change', e=>{
-        state.leftId = e.target.value;
-        updateSideInfo('left');
-      });
-      $('#rightSel').addEventListener('change', e=>{
-        state.rightId = e.target.value;
-        updateSideInfo('right');
-      });
-
-      $('#startBtn').addEventListener('click', ()=>{
-        resetBattle();
-      });
-      $('#stepBtn').addEventListener('click', ()=>{
-        stepTurn();
-      });
-      $('#autoBtn').addEventListener('click', ()=>{
-        autoBattle();
-      });
-    }
-
-    init(); // 이 부분은 그대로 두면 됩니다.
-  </script>
+  init();
+</script>
 </body>
 </html>

@@ -216,11 +216,12 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
   </section>
 
   <!-- RIGHT: editor -->
-  <section class="card">
+  <section class="card hidden" id="editorCard">
     <div class="grid2">
       <div class="field"><label>이름</label><input id="fName" placeholder="예: 고양이 탐정"></div>
       <div class="field"><label>직업</label><select id="fRole">
         <option>없음</option>
+        <option>전사</option>
         <option>기사(비기너)</option>
         <option>기사(익스퍼트)</option>
         <option>기사(마스터)</option>
@@ -234,7 +235,12 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
         <option>입마(入魔)</option>
         <option>극마(極魔)</option>
         <option>탈마(脫魔)</option>
-        <option>무극(武極)</option>
+        <option>궁수</option>
+        <option>절궁</option>
+        <option>암살자</option>
+        <option>마술사</option>
+        <option>마법사</option>
+        <option>마도사</option>
         <option>수녀</option>
         <option>수도원장</option>
         <option>부제(부사제)</option>
@@ -262,8 +268,15 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
       <div class="field"><label>민첩</label><input id="stAgi" type="number" value="0"></div>
       <div class="field"><label>지력</label><input id="stInt" type="number" value="0"></div>
       <div class="field"><label>마나/내력</label><input id="stMana" type="number" value="0"></div>
+      </div>
+    <hr>
+    <h3>특수 능력치</h3>
+    <div class="grid2">
       <div class="field"><label>행운</label><input id="stLuck" type="number" value="0"></div>
+      <!-- 향후 추가 가능: 예: 신성력, 저항 등 -->
     </div>
+  </div>
+
 
     <hr>
     <h3>장비</h3>
@@ -273,6 +286,9 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
       <div class="field"><label>셔츠</label><input id="eqShirt" placeholder="예: 회색 셔츠"></div>
       <div class="field"><label>신발</label><input id="eqBoots" placeholder="예: 로퍼"></div>
       <div class="field"><label>무기</label><input id="eqWeapon" placeholder="예: 회중시계(비밀)"></div>
+      <div class="field"><label>장신구(목걸이)</label><input id="eqWeapon" placeholder="예: 펜던트"></div>
+      <div class="field"><label>장신구(반지)</label><input id="eqWeapon" placeholder="예: 고목나무 반지"></div>
+      <div class="field"><label>장신구(반지)</label><input id="eqWeapon" placeholder="예: 잎새의 반지"></div>
     </div>
 
     <hr>
@@ -337,6 +353,16 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
   </div>
 </div>
 
+  <!-- 1) 공통 API 로드 -->
+  <script src="js/api.js"></script>
+
+  <!-- 2) 토큰 없으면 로그인 페이지로 -->
+  <script>
+    if (!getToken || !getToken()) {
+      window.location.href = 'login.html';
+    }
+  </script>
+
   <script>
     /* =========================================================
     *  상수 / 레이블 / 공통 상태
@@ -358,6 +384,73 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
       blessing:    '가호',
       proficiency: '숙련도'
     };
+
+    // ==== 직업 정의 (jobId 기반) ====
+    const JOB_DEFS = {
+      none: {
+        id: 'job_none',
+        name: '무직',
+        stat: { str:0, end:0, agi:0, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      warrior: {
+        id: 'job_warrior',
+        name: '전사',
+        stat: { str:3, end:2, agi:0, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      archer: {
+        id: 'job_archer',
+        name: '궁수',
+        stat: { str:1, end:0, agi:3, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      assassin: {
+        id: 'job_assassin',
+        name: '암살자',
+        stat: { str:1, end:0, agi:4, int:0, mana:0, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      mage: {
+        id: 'job_mage',
+        name: '마법사',
+        stat: { str:0, end:0, agi:0, int:4, mana:3, luck:0 },
+        resource: 'mana',
+        hidden: false
+      },
+      priest: {
+        id: 'job_priest',
+        name: '성직자',
+        stat: { str:0, end:1, agi:0, int:3, mana:3, luck:0 },
+        resource: 'holy',   // ★ 성직자는 신성력 자원 사용
+        hidden: false
+      },
+      // 예시 히든 직업 (원하는 만큼 추가 가능)
+      hiddenSaint: {
+        id: 'job_hidden_saint',
+        name: '성자의 대리자',
+        stat: { str:2, end:3, agi:1, int:4, mana:5, luck:2 },
+        resource: 'holy',
+        hidden: true
+      }
+    };
+
+    const JOB_BY_NAME = {};
+    const JOB_BY_ID   = {};
+    Object.values(JOB_DEFS).forEach(j => {
+      JOB_BY_NAME[j.name] = j;
+      JOB_BY_ID[j.id]     = j;
+    });
+
+    function getJobForCharacter(ch) {
+      if (ch.jobId && JOB_BY_ID[ch.jobId]) return JOB_BY_ID[ch.jobId];
+      if (ch.role && JOB_BY_NAME[ch.role]) return JOB_BY_NAME[ch.role];
+      return JOB_DEFS.none;
+    }
 
     // 등급 정렬 기준 (앞에 있을수록 높은 등급)
     const RANK_ORDER = [
@@ -381,11 +474,99 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
     // 화면/데이터 공통 상태
     const S = {
       list:      [],       // 전체 캐릭터 목록
-      currentId: null,     // 현재 편집 중인 캐릭터 id
-      skills:    [],       // 현재 캐릭터의 스킬/특성 리스트
-      timeline:  [],       // 현재 캐릭터의 타임라인
-      imgData:   ''        // 현재 캐릭터 이미지(DataURL)
+      currentId: null,     // 현재 선택된 캐릭터 id
+      skills:    [],       // 현재 캐릭터의 스킬/특성 배열
+      timeline:  [],       // 타임라인(텍스트 로그)
+      imgData:   ''        // 업로드한 이미지 데이터(미리보기용)
     };
+
+    // ==== 로그인 유저 정보 / 권한 관련 ====
+    let currentUser = null;
+
+    // /api/me 호출해서 현재 유저 정보 가져오기
+    async function loadCurrentUser() {
+      try {
+        const res = await fetchMe();    // api.js에 이미 있음
+        currentUser = res && res.user ? res.user : null;
+      } catch (e) {
+        console.error('현재 유저 정보 로드 실패', e);
+        currentUser = null;
+      }
+    }
+
+    // admin 여부
+    function isAdmin() {
+      return currentUser && currentUser.role === 'admin';
+    }
+
+    // 특수 조건(추가 캐릭터 슬롯 해금 여부)
+    // - 게임 내에서 조건 달성 시 localStorage.setItem('extraCharUnlocked','1') 같은 식으로 세팅한다고 가정
+    function hasExtraSlot() {
+      return localStorage.getItem('extraCharUnlocked') === '1';
+    }
+
+    // "새 캐릭터" 버튼 노출 여부 적용
+    function applyCreateButtonVisibility() {
+      const btn = $id('newBtn');
+      if (!btn) return;
+
+      if (isAdmin() || hasExtraSlot()) {
+        btn.style.display = 'inline-flex';   // 버튼 보이기
+      } else {
+        btn.style.display = 'none';          // 일반 유저는 숨김
+      }
+    }
+
+    /* ✅ 추가: 일반 유저는 편집/저장 불가 (읽기 전용 잠금) */
+    function applyEditLockForNonAdmin() {
+      if (isAdmin()) {
+        // 관리자면 아무 것도 막지 않음
+        return;
+      }
+
+      // 1) 저장 버튼 비활성화
+      const saveBtn = $id('saveBtn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.title = '일반 유저는 캐릭터를 수정/저장할 수 없습니다.';
+      }
+
+      // 2) 입력 필드/스탯/장비/노트 등 읽기 전용
+      const readOnlyIds = [
+        'fName','fRole','fSub','fNote',
+        'stStr','stEnd','stAgi','stInt','stMana','stLuck',
+        'eqGlove','eqPants','eqShirt','eqBoots','eqWeapon',
+        'skillInput','tlDate','tlText'
+      ];
+
+      readOnlyIds.forEach(id => {
+        const el = $id(id);
+        if (!el) return;
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+          el.readOnly = true;
+          el.disabled = true;   // select 같은 건 disabled로
+        }
+      });
+
+      // 3) 파일/버튼류 막기 (이미지 업로드, 스킬 파일, 타임라인 추가, 도감 선택 등)
+      const disableIds = ['fImg','skillFile','tlAdd','pickFromCodex'];
+      disableIds.forEach(id => {
+        const el = $id(id);
+        if (el) el.disabled = true;
+      });
+
+      const disableButtons = [
+        'exportBtn','importInput',
+        'exportOneBtn','importOneInput',
+        'openDataBtn','saveDataBtn'
+      ];
+
+      disableButtons.forEach(id => {
+        const el = $id(id);
+        if (el) el.disabled = true;
+      });
+    }
+
 
     /* =========================================================
     *  DOM 참조 & 뷰 모드 전환
@@ -394,7 +575,7 @@ hr{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:12px 0}
     const listEl   = $id('list');
     const imgPrev  = $id('imgPrev');
     const wrapEl   = document.querySelector('.wrap');
-    const editorEl = document.querySelector('.wrap > .card:nth-of-type(2)');
+    const editorEl = document.getElementById('editorCard');
 
     /**
      * 보기 모드 전환
@@ -552,10 +733,17 @@ function saveMembersToLocal() {
         return;
       }
 
+      // 🔹 대표 캐릭터 id 가져오기
+      const repId = localStorage.getItem(REP);
+
       S.list.forEach(ch => {
         const item = document.createElement('div');
         item.className = 'item';
-        if (ch.id === S.currentId) item.classList.add('active');
+
+        const isCurrent = ch.id === S.currentId;
+        const isRep     = repId && ch.id === repId;
+
+        if (isCurrent) item.classList.add('active');
 
         const img = ch.img
           ? `<img src="${ch.img}" alt="" class="thumb">`
@@ -565,7 +753,10 @@ function saveMembersToLocal() {
           ${img}
           <div class="meta">
             <strong>${ch.name || '무명'}</strong>
-            <div class="small">${ch.role || '역할 미지정'}</div>
+            <div class="small">
+              ${ch.role || '역할 미지정'}
+              ${isRep ? '<span class="badge" style="margin-left:4px;">대표</span>' : ''}
+            </div>
           </div>
         `;
 
@@ -667,6 +858,12 @@ function saveMembersToLocal() {
     * ======================================================= */
 
     function save() {
+      // ✅ 관리자만 수정/저장 가능
+      if (!isAdmin()) {
+        alert('캐릭터 편집 및 저장은 관리자만 가능합니다.');
+        return;
+      }
+
       const id       = S.currentId || uid();
       const existing = S.list.find(c => c.id === id);
 
@@ -689,20 +886,27 @@ function saveMembersToLocal() {
         weapon: ($id('eqWeapon').value || '').trim()
       };
 
-      // 업로드한 이미지(S.imgData)를 우선 사용, 없으면 기존/미리보기
+      // 업로드한 이미지
       const imgData = S.imgData || (existing && existing.img) || imgPrev.src || '';
+
+      // ★ role 텍스트 → jobId 매핑
+      const roleName = ($id('fRole').value || '').trim();
+      const job      = JOB_BY_NAME[roleName] || JOB_DEFS.none;
 
       const d = {
         id,
         name: ($id('fName').value || '').trim(),
-        role: ($id('fRole').value || '').trim(),
+        role: roleName,
+        // ★ 직업 시스템 내부 id
+        jobId: job.id,
         sub:  ($id('fSub').value  || '').trim(),
         note: ($id('fNote').value || '').trim(),
         img:  imgData,
         stats,
         equip,
-        skills:   [...S.skills],
-        timeline: [...S.timeline]
+        // S.skills / S.timeline 배열을 그대로 복사해서 저장
+        skills:   Array.isArray(S.skills)   ? [...S.skills]   : [],
+        timeline: Array.isArray(S.timeline) ? [...S.timeline] : []
       };
 
       const idx = S.list.findIndex(c => c.id === id);
@@ -751,18 +955,21 @@ function saveMembersToLocal() {
 
         pill.textContent = label;
 
-        // pill 클릭 → 제거 확인 후 삭제
-        pill.onclick = () => {
-          if (confirm(`"${label}" 을(를) 제거할까요?`)) {
-            S.skills.splice(i, 1);
-            drawSkills();
-          }
-        };
+        // ✅ 관리자만 삭제 가능
+        if (isAdmin()) {
+          pill.onclick = () => {
+            if (confirm(`"${label}" 을(를) 제거할까요?`)) {
+              S.skills.splice(i, 1);
+              drawSkills();
+            }
+          };
+        } else {
+          pill.onclick = null;   // 일반 유저는 클릭해도 아무 일도 안 일어남
+        }
 
         box.appendChild(pill);
       });
     }
-
     // 시간순 텍스트만 보여주는 타임라인
     function drawTimeline() {
       const wrap = $id('timelineWrap');
@@ -1154,6 +1361,10 @@ function saveMembersToLocal() {
           return;
         }
         localStorage.setItem(REP, S.currentId);
+
+        // 🔹 리스트에 바로 대표 배지 반영
+        drawList();
+
         alert('대표 캐릭터로 지정했습니다.');
       };
 
@@ -1411,16 +1622,43 @@ function saveMembersToLocal() {
     /* =========================================================
     *  초기 실행
     * ======================================================= */
-
     (async function init() {
-      await loadInitialMembers(); // ★ 서버/로컬에서 멤버 로딩 끝날 때까지 대기
+      // 1) 현재 로그인 유저 정보(권한) 먼저 로딩
+      await loadCurrentUser();
+
+      // 2) 멤버 목록 로드
+      await loadInitialMembers(); // 서버/로컬에서 멤버 로딩
+
+      // 🔹 2-1) 저장된 대표 캐릭터가 있으면 선택 상태 복원
+      const repId = localStorage.getItem(REP);
+      if (repId) {
+        const repMember = S.list && S.list.find(c => c.id === repId);
+        if (repMember) {
+          S.currentId = repId;
+        } else {
+          // 대표로 지정된 캐릭터가 더 이상 없으면 대표 설정도 정리
+          localStorage.removeItem(REP);
+        }
+      }
+
+      // 3) 새 캐릭터 버튼 노출 여부 적용 (admin + 특수 조건)
+      applyCreateButtonVisibility();
+
+      // ✅ 3-1) 일반 유저는 편집/저장 잠금
+      applyEditLockForNonAdmin();
+
+      // 4) 이 유저에게 캐릭터가 하나도 없다면 → 생성 페이지로 강제 이동
+      if (!S.list || S.list.length === 0) {
+        window.location.href = 'create.html';
+        return;
+      }
+
+      // 5) 기존 동작
       bindEvents();               // 버튼/입력 이벤트 연결
       drawList();                 // 리스트 최초 렌더
       setViewMode('list');        // 처음에는 리스트 우선 모드
     })();
+
   </script>
 </body>
 </html>
-
-
-

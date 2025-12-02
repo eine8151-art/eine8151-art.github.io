@@ -117,9 +117,9 @@
         <button class="mbtn" data-filter="blessing">가호</button>
         <button class="mbtn" data-filter="proficiency">숙련도</button>
         <hr style="border-color:rgba(255,255,255,.08)">
-        <button class="mbtn" id="addBtn">+ 새 항목</button>
+        <button class="mbtn only-admin" id="addBtn">+ 새 항목</button>
         <label class="mbtn">불러오기(JSON)
-          <input type="file" id="importInput" accept="application/json" hidden>
+          <input class="only-admin" type="file" id="importInput" accept="application/json" hidden>
         </label>
         <button class="mbtn" id="exportBtn">내보내기(JSON)</button>
         <a class="mbtn" href="index.html">← 메인</a>
@@ -158,7 +158,7 @@
           <strong id="dwTitle">항목</strong>
           <div>
             <button id="closeDw" class="btn">닫기</button>
-            <button id="saveDw" class="btn gold">저장</button>
+            <button id="saveDw" class="btn gold only-admin">저장</button>
           </div>
         </div>
         <div class="kv"><label>종류</label><select id="fType">
@@ -199,6 +199,26 @@
           <option value="F">F</option>
           <option value="F-">F-</option>
         </select></div>
+
+        <!-- ★ 새로 추가: 랜덤/조건 설정 -->
+        <div class="kv">
+          <label>랜덤 획득 후보</label>
+          <label class="inline">
+            <input type="checkbox" id="fRandomCandidate">
+            초기/랜덤 획득 풀에 포함
+          </label>
+        </div>
+
+        <div class="kv">
+          <label>조건 – 직업</label>
+          <input id="fCondJobs" placeholder="예: 용사, 검사, 궁수">
+        </div>
+
+        <div class="kv">
+          <label>조건 – 종족</label>
+          <input id="fCondRaces" placeholder="예: 엘프, 하프엘프">
+        </div>
+
         <div class="kv"><label>아이콘</label>
           <div class="inline">
             <input id="fIcon" placeholder="이미지 URL (선택)">
@@ -215,12 +235,29 @@
           <div class="statrow"><span>민첩</span><div class="bar"><span></span></div><input id="mAgi" type="number" value="0"><input id="mAgiP" type="number" step="0.1" value="0" placeholder="%"></div>
           <div class="statrow"><span>지력</span><div class="bar"><span></span></div><input id="mInt" type="number" value="0"><input id="mIntP" type="number" step="0.1" value="0" placeholder="%"></div>
           <div class="statrow"><span>자원</span><div class="bar"><span></span></div><input id="mMana" type="number" value="0"><input id="mManaP" type="number" step="0.1" value="0" placeholder="%"></div>
-          <div class="statrow"><span>행운</span><div class="bar"><span></span></div><input id="mLuck" type="number" value="0"><input id="mLuckP" type="number" step="0.1" value="0" placeholder="%"></div>
+            <!-- 🔹 추가: 턴당 마나 재생 -->
+            <div class="statrow">
+              <span>마나 재생</span>
+              <div class="bar"><span></span></div>
+              <input id="mMpRegen" type="number" value="0" title="턴마다 회복되는 마나 양 (고정값)">
+              <span style="font-size:12px;margin-left:4px">/턴</span>
+            </div>
+            <div class="statrow"><span>행운</span><div class="bar"><span></span></div><input id="mLuck" type="number" value="0"><input id="mLuckP" type="number" step="0.1" value="0" placeholder="%"></div>
         </div>
         <p style="color:var(--muted);margin-top:6px">※ 스탯 보정은 "특성" 종류에서만 사용됩니다. (±, % 모두 지원) — <small>기존 키(atk/def/spd/hp)와도 자동 호환</small></p>
       </aside>
     </main>
-  </div>
+ </div>
+
+    <!-- API 유틸 (getToken, fetchMe, apiGet, apiPost 등) -->
+    <script src="js/api.js"></script>
+
+    <!-- 로그인 안 되어 있으면 로그인 페이지로 이동 -->
+    <script>
+      if (!window.getToken || !getToken()) {
+        window.location.href = 'login.html';
+      }
+    </script>
 
     <script>
     /* =========================================================
@@ -290,13 +327,19 @@
       tags:     $('#fTags'),
       rank:     $('#fRank'),
 
+      // ★ 랜덤/조건 설정
+      randomCandidate: $('#fRandomCandidate'),
+      condJobs:        $('#fCondJobs'),
+      condRaces:       $('#fCondRaces'),
+
       // 고정값 보정
-      mStr:  $('#mStr'),
-      mEnd:  $('#mEnd'),
-      mAgi:  $('#mAgi'),
-      mInt:  $('#mInt'),
-      mMana: $('#mMana'),
-      mLuck: $('#mLuck'),
+      mStr:     $('#mStr'),
+      mEnd:     $('#mEnd'),
+      mAgi:     $('#mAgi'),
+      mInt:     $('#mInt'),
+      mMana:    $('#mMana'),
+      mMpRegen: $('#mMpRegen'),  // 🔹 추가: 턴당 마나 재생
+      mLuck:    $('#mLuck'),
 
       // % 보정
       mStrP:  $('#mStrP'),
@@ -325,13 +368,17 @@
       }
     }
 
-    // localStorage에 도감 데이터 저장
+    // localStorage에 도감 데이터 저장 (캐시 용도)
     function save(data){
       localStorage.setItem(KEY, JSON.stringify(data));
     }
 
-    // 실제 메모리 상의 도감 배열
-    let data = load();
+    // 실제 메모리 상의 도감 배열 (초기에는 빈 배열, init()에서 채움)
+    let data = [];
+
+    // 현재 로그인 유저 / 권한
+    let currentUser = null;
+    let isAdmin     = false;
 
     // 현재 드로어에서 편집 중인 항목
     let current = null;
@@ -529,6 +576,16 @@
       f.rank.value = current.rank || '';
       f.iconPrev.src = current.icon || '';
 
+      // ★ 랜덤/조건 필드 채우기
+      // undefined 인 기존 데이터도 자연스럽게 동작하도록 기본값 처리
+      f.randomCandidate.checked = current.randomCandidate !== false; // 기본값: true
+      f.condJobs.value  = Array.isArray(current.condJobs)
+        ? current.condJobs.join(', ')
+        : (current.condJobs || '');
+      f.condRaces.value = Array.isArray(current.condRaces)
+        ? current.condRaces.join(', ')
+        : (current.condRaces || '');
+
       // 스탯 보정 값 (기존 키 호환: atk/def/spd/hp → str/end/agi/mana)
       const m = current.mod  || {};
       const p = current.modP || {};
@@ -540,6 +597,9 @@
       f.mInt.value  = m.int  ?? 0;
       f.mMana.value = m.mana ?? m.hp  ?? 0;
       f.mLuck.value = m.luck ?? 0;
+
+      // 🔹 추가: 턴당 마나 재생 (기존 데이터엔 없을 수 있으니 기본 0)
+      f.mMpRegen.value = current.mpRegen ?? 0;
 
       // % 보정
       f.mStrP.value  = p.str  ?? p.atk ?? 0;
@@ -587,47 +647,77 @@
     /**
      * 현재 드로어의 내용을 data 배열에 반영하고 localStorage 에 저장
      */
-    function persist(){
+    async function persist(){
       const idx = data.findIndex(x => x.id === current.id);
 
-      // 폼의 값을 읽어서 하나의 entry로 구성
-      const entry = {
-        id:   current.id,
-        type: f.type.value,
-        name: f.name.value.trim(),
-        icon: f.icon.value.trim(),
-        desc: f.desc.value.trim(),
-        tags: f.tags.value.trim(),
-        rank: f.rank.value,
+    const entry = {
+      id:   current.id,
+      type: f.type.value,
+      name: f.name.value.trim(),
+      icon: f.icon.value.trim(),
+      desc: f.desc.value.trim(),
+      tags: f.tags.value.trim(),
+      rank: f.rank.value,
 
-        // 새 키로 저장 (str/end/agi/int/mana/luck)
-        mod: {
-          str:  +f.mStr.value  || 0,
-          end:  +f.mEnd.value  || 0,
-          agi:  +f.mAgi.value  || 0,
-          int:  +f.mInt.value  || 0,
-          mana: +f.mMana.value || 0,
-          luck: +f.mLuck.value || 0
-        },
-        modP: {
-          str:  +f.mStrP.value  || 0,
-          end:  +f.mEndP.value  || 0,
-          agi:  +f.mAgiP.value  || 0,
-          int:  +f.mIntP.value  || 0,
-          mana: +f.mManaP.value || 0,
-          luck: +f.mLuckP.value || 0
-        }
-      };
+      // ★ 랜덤/조건 설정 저장
+      randomCandidate: !!f.randomCandidate.checked,
+      condJobs: (f.condJobs.value || '')
+        .split(/\s*,\s*/)
+        .map(s => s.trim())
+        .filter(Boolean),
+      condRaces: (f.condRaces.value || '')
+        .split(/\s*,\s*/)
+        .map(s => s.trim())
+        .filter(Boolean),
+
+      // 🔹 추가: 턴당 마나 재생량
+      //   - 도감에서는 이 값을 특성/숙련도/권능 등의 패시브로만 사용
+      mpRegen: +f.mMpRegen.value || 0,
+
+      // 새 키로 저장 (str/end/agi/int/mana/luck)
+      mod: {
+        str:  +f.mStr.value  || 0,
+        end:  +f.mEnd.value  || 0,
+        agi:  +f.mAgi.value  || 0,
+        int:  +f.mInt.value  || 0,
+        mana: +f.mMana.value || 0,
+        luck: +f.mLuck.value || 0
+      },
+      modP: {
+        str:  +f.mStrP.value  || 0,
+        end:  +f.mEndP.value  || 0,
+        agi:  +f.mAgiP.value  || 0,
+        int:  +f.mIntP.value  || 0,
+        mana: +f.mManaP.value || 0,
+        luck: +f.mLuckP.value || 0
+      }
+    };
 
       // 기존 항목이면 교체, 아니면 새로 추가
-      if(idx >= 0) data[idx] = entry;
-      else         data.push(entry);
+      if (idx >= 0) data[idx] = entry;
+      else          data.push(entry);
 
-      // 저장 & UI 갱신
-      save(data);
-      buildTagChips();
-      render(currentFilter());
-      closeDrawer();
+      // 🔒 관리자만 저장 가능
+      if (!isAdmin) {
+        alert('관리자만 도감을 수정할 수 있습니다.');
+        return;
+      }
+
+      try {
+        // 서버에 전역 도감 저장 (server.js 에서 /api/codex POST 구현해둔 것)
+        await apiPost('/api/codex', { items: data });
+
+        // localStorage 캐시도 갱신
+        save(data);
+
+        // UI 갱신
+        buildTagChips();
+        render(currentFilter());
+        closeDrawer();
+      } catch (err) {
+        console.error(err);
+        alert('도감 저장 실패: ' + (err.error || err.message || '알 수 없는 오류'));
+      }
     }
 
     /* =========================================================
@@ -684,22 +774,39 @@
       URL.revokeObjectURL(a.href);
     };
 
-    // JSON 불러오기
+    // JSON 불러오기 (관리자 전용 업로드)
     importInput.onchange = e => {
       const file = e.target.files?.[0];
-      if(!file) return;
+      if (!file) return;
 
       const r = new FileReader();
-      r.onload = () => {
-        try{
+      r.onload = async () => {
+        try {
           const arr = JSON.parse(r.result);
-          if(Array.isArray(arr)){
+          if (Array.isArray(arr)) {
+            if (!isAdmin) {
+              alert('관리자만 도감 JSON을 업로드할 수 있습니다.');
+              return;
+            }
+
             data = arr;
-            save(data);
-            buildTagChips();
-            render(currentFilter());
+
+            try {
+              // 서버에 전역 도감 저장
+              await apiPost('/api/codex', { items: data });
+
+              // localStorage 캐시 갱신
+              save(data);
+
+              buildTagChips();
+              render(currentFilter());
+              alert('도감 JSON이 서버에 저장되었습니다.');
+            } catch (err) {
+              console.error(err);
+              alert('도감 업로드 실패: ' + (err.error || err.message || '알 수 없는 오류'));
+            }
           }
-        }catch{
+        } catch {
           // 파싱 실패 시 조용히 무시
         }
       };
@@ -707,11 +814,63 @@
     };
 
     /* =========================================================
-     *  초기 렌더링
-     * ======================================================= */
+    *  초기 로딩 (로그인/권한 + 서버 도감 동기화) & 렌더링
+    * ======================================================= */
 
-    render('all');
-    buildTagChips();
+    async function init() {
+      // 1) 내 정보에서 role 확인
+      try {
+        const me = await fetchMe();       // api.js 에 구현되어 있다고 가정
+        currentUser = me.user || me;
+
+        const rawRole = (currentUser.role || '').toString();
+        const rawName = (currentUser.username || currentUser.name || '').toString();
+
+        const roleLower = rawRole.toLowerCase();
+        const nameLower = rawName.toLowerCase();
+
+        // 여러 형태를 다 받아서 admin 판정
+        const flagAdmin = !!(currentUser.isAdmin || currentUser.admin);
+
+        isAdmin =
+          flagAdmin ||                 // isAdmin / admin 플래그
+          roleLower === 'admin' ||     // role: 'admin'
+          nameLower === 'admin';       // 계정명이 admin 인 경우
+
+        console.log('currentUser =', currentUser, 'isAdmin =', isAdmin);
+
+        // 관리자 전용 버튼 비활성화
+        if (!isAdmin) {
+          document.querySelectorAll('.only-admin').forEach(el => {
+            if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') {
+              el.disabled = true;
+            }
+            el.classList.add('disabled');
+          });
+        }
+      } catch (e) {
+        console.warn('내 정보(fetchMe) 실패', e);
+      }
+
+      // 2) 서버에서 도감 로드 (실패 시 localStorage 캐시 사용)
+      try {
+        const arr = await apiGet('/api/codex');
+        if (Array.isArray(arr)) {
+          data = arr;
+          save(data);   // 캐시 갱신
+        } else {
+          data = load();
+        }
+      } catch (e) {
+        console.warn('서버 도감 불러오기 실패, localStorage 사용', e);
+        data = load();
+      }
+
+      buildTagChips();
+      render('all');
+    }
+
+    init();
   </script>
 </body>
 </html>
