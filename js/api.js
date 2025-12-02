@@ -1,7 +1,5 @@
 // api.js
-
-// ⚠ 개발 중: 로컬 서버
-const API_BASE = "http://58.238.235.170:4000";
+const API_BASE = window.location.origin;
 
 function getToken() {
   return localStorage.getItem('authToken');
@@ -37,8 +35,22 @@ async function apiPost(path, body) {
     },
     body: JSON.stringify(body)
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+
+  const ct = res.headers.get('content-type') || '';
+
+  let data;
+  if (ct.includes('application/json')) {
+    // 정상 JSON 응답
+    data = await res.json();
+  } else {
+    // 에러 페이지(HTML 등)인 경우
+    const text = await res.text();
+    data = { error: text };
+  }
+
+  if (!res.ok) {
+    throw data;
+  }
   return data;
 }
 
